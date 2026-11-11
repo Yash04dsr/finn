@@ -1,0 +1,27 @@
+{
+  "name": "FINN — Investment Intelligence Agent",
+  "short_name": "FINN",
+  "description": "Personal investment intelligence agent: filings, volume anomalies and an EOD digest, ranked by what actually matters.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0E14",
+  "theme_color": "#0A0E14",
+  "categories": ["finance", "news", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

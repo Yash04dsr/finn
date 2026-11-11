@@ -1,0 +1,25 @@
+# env & secrets
+.env
+backend/.env
+*.env.local
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# data (DB is rebuilt from seeders; PDFs not redistributable)
+backend/data/finn.db*
+backend/data/docs/*.pdf
+
+# node
+node_modules/
+.next/
+out/
+next-env.d.ts
+
+# misc
+.DS_Store
+*.log

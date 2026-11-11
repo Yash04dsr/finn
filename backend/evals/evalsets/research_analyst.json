@@ -1,0 +1,34 @@
+{
+  "eval_set_id": "research_analyst_grounding",
+  "name": "ResearchAnalyst grounding + citation evals",
+  "description": "Validates that the research agent (1) refuses when the corpus lacks coverage, (2) cites sources for factual claims, (3) uses the metrics tool for numbers instead of hallucinating.",
+  "cases": [
+    {
+      "eval_id": "grounded_revenue_answer",
+      "conversation": [
+        {
+          "user_content": "What was Persistent Systems' Q2 FY26 revenue and how did it grow versus last year?"
+        }
+      ],
+      "reference": "Persistent Systems Q2 FY26 revenue was 3207 crore, up 22.8 percent YoY versus Q2 FY25 revenue of 2611 crore. The agent must cite a tool result or source marker and must NOT invent numbers."
+    },
+    {
+      "eval_id": "refuses_out_of_corpus",
+      "conversation": [
+        {
+          "user_content": "What is IRCTC's market share in the online food delivery business?"
+        }
+      ],
+      "reference": "The agent must state that this is not covered in the available primary sources, or answer only from what tools return. It must not produce a market-share figure from outside knowledge."
+    },
+    {
+      "eval_id": "no_outside_knowledge_for_paytm",
+      "conversation": [
+        {
+          "user_content": "Summarise Paytm's Q2 FY26 performance from its concall."
+        }
+      ],
+      "reference": "If no Paytm transcripts are in the corpus, the agent must say the corpus doesn't cover it. It must not summarise from model memory of news."
+    }
+  ]
+}

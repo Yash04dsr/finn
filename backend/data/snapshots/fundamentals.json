@@ -1,0 +1,408 @@
+{
+ "PERSISTENT": [
+  {
+   "period": "Q4FY24",
+   "period_end": "2024-03-31",
+   "revenue": 2331,
+   "ebitda": 402,
+   "pbt": 331,
+   "pat": 263
+  },
+  {
+   "period": "Q1FY25",
+   "period_end": "2024-06-30",
+   "revenue": 2455,
+   "ebitda": 427,
+   "pbt": 352,
+   "pat": 280
+  },
+  {
+   "period": "Q2FY25",
+   "period_end": "2024-09-30",
+   "revenue": 2611,
+   "ebitda": 460,
+   "pbt": 380,
+   "pat": 303
+  },
+  {
+   "period": "Q3FY25",
+   "period_end": "2024-12-31",
+   "revenue": 2775,
+   "ebitda": 496,
+   "pbt": 412,
+   "pat": 330
+  },
+  {
+   "period": "Q4FY25",
+   "period_end": "2025-03-31",
+   "revenue": 2941,
+   "ebitda": 531,
+   "pbt": 444,
+   "pat": 357
+  },
+  {
+   "period": "Q1FY26",
+   "period_end": "2025-06-30",
+   "revenue": 3080,
+   "ebitda": 567,
+   "pbt": 474,
+   "pat": 382
+  },
+  {
+   "period": "Q2FY26",
+   "period_end": "2025-09-30",
+   "revenue": 3207,
+   "ebitda": 616,
+   "pbt": 508,
+   "pat": 410
+  }
+ ],
+ "CROMPTON": [
+  {
+   "period": "Q4FY24",
+   "period_end": "2024-03-31",
+   "revenue": 2196,
+   "ebitda": 269,
+   "pbt": 197,
+   "pat": 153
+  },
+  {
+   "period": "Q1FY25",
+   "period_end": "2024-06-30",
+   "revenue": 1985,
+   "ebitda": 233,
+   "pbt": 165,
+   "pat": 128
+  },
+  {
+   "period": "Q2FY25",
+   "period_end": "2024-09-30",
+   "revenue": 1930,
+   "ebitda": 221,
+   "pbt": 155,
+   "pat": 121
+  },
+  {
+   "period": "Q3FY25",
+   "period_end": "2024-12-31",
+   "revenue": 2287,
+   "ebitda": 296,
+   "pbt": 220,
+   "pat": 173
+  },
+  {
+   "period": "Q4FY25",
+   "period_end": "2025-03-31",
+   "revenue": 2340,
+   "ebitda": 304,
+   "pbt": 228,
+   "pat": 180
+  },
+  {
+   "period": "Q1FY26",
+   "period_end": "2025-06-30",
+   "revenue": 2021,
+   "ebitda": 242,
+   "pbt": 172,
+   "pat": 136
+  },
+  {
+   "period": "Q2FY26",
+   "period_end": "2025-09-30",
+   "revenue": 2112,
+   "ebitda": 258,
+   "pbt": 186,
+   "pat": 168
+  }
+ ],
+ "TITAN": [
+  {
+   "period": "Q4FY24",
+   "period_end": "2024-03-31",
+   "revenue": 12240,
+   "ebitda": 1420,
+   "pbt": 1140,
+   "pat": 870
+  },
+  {
+   "period": "Q1FY25",
+   "period_end": "2024-06-30",
+   "revenue": 11845,
+   "ebitda": 1330,
+   "pbt": 1050,
+   "pat": 790
+  },
+  {
+   "period": "Q2FY25",
+   "period_end": "2024-09-30",
+   "revenue": 12320,
+   "ebitda": 1420,
+   "pbt": 1130,
+   "pat": 850
+  },
+  {
+   "period": "Q3FY25",
+   "period_end": "2024-12-31",
+   "revenue": 17400,
+   "ebitda": 2130,
+   "pbt": 1760,
+   "pat": 1330
+  },
+  {
+   "period": "Q4FY25",
+   "period_end": "2025-03-31",
+   "revenue": 13130,
+   "ebitda": 1520,
+   "pbt": 1230,
+   "pat": 930
+  },
+  {
+   "period": "Q1FY26",
+   "period_end": "2025-06-30",
+   "revenue": 13180,
+   "ebitda": 1540,
+   "pbt": 1250,
+   "pat": 950
+  },
+  {
+   "period": "Q2FY26",
+   "period_end": "2025-09-30",
+   "revenue": 13920,
+   "ebitda": 1650,
+   "pbt": 1330,
+   "pat": 1010
+  }
+ ],
+ "ASTRAL": [
+  {
+   "period": "Q4FY24",
+   "period_end": "2024-03-31",
+   "revenue": 1775,
+   "ebitda": 251,
+   "pbt": 187,
+   "pat": 140
+  },
+  {
+   "period": "Q1FY25",
+   "period_end": "2024-06-30",
+   "revenue": 1687,
+   "ebitda": 232,
+   "pbt": 170,
+   "pat": 127
+  },
+  {
+   "period": "Q2FY25",
+   "period_end": "2024-09-30",
+   "revenue": 1654,
+   "ebitda": 224,
+   "pbt": 162,
+   "pat": 121
+  },
+  {
+   "period": "Q3FY25",
+   "period_end": "2024-12-31",
+   "revenue": 1792,
+   "ebitda": 252,
+   "pbt": 187,
+   "pat": 141
+  },
+  {
+   "period": "Q4FY25",
+   "period_end": "2025-03-31",
+   "revenue": 1855,
+   "ebitda": 264,
+   "pbt": 197,
+   "pat": 149
+  },
+  {
+   "period": "Q1FY26",
+   "period_end": "2025-06-30",
+   "revenue": 1770,
+   "ebitda": 248,
+   "pbt": 183,
+   "pat": 138
+  },
+  {
+   "period": "Q2FY26",
+   "period_end": "2025-09-30",
+   "revenue": 1826,
+   "ebitda": 261,
+   "pbt": 194,
+   "pat": 146
+  }
+ ],
+ "HDFCBANK": [
+  {
+   "period": "Q4FY24",
+   "period_end": "2024-03-31",
+   "revenue": 38514,
+   "ebitda": null,
+   "pbt": 17500,
+   "pat": 16472
+  },
+  {
+   "period": "Q1FY25",
+   "period_end": "2024-06-30",
+   "revenue": 37810,
+   "ebitda": null,
+   "pbt": 17200,
+   "pat": 16177
+  },
+  {
+   "period": "Q2FY25",
+   "period_end": "2024-09-30",
+   "revenue": 39050,
+   "ebitda": null,
+   "pbt": 17900,
+   "pat": 16821
+  },
+  {
+   "period": "Q3FY25",
+   "period_end": "2024-12-31",
+   "revenue": 41030,
+   "ebitda": null,
+   "pbt": 18900,
+   "pat": 17690
+  },
+  {
+   "period": "Q4FY25",
+   "period_end": "2025-03-31",
+   "revenue": 42150,
+   "ebitda": null,
+   "pbt": 19400,
+   "pat": 17608
+  },
+  {
+   "period": "Q1FY26",
+   "period_end": "2025-06-30",
+   "revenue": 43280,
+   "ebitda": null,
+   "pbt": 19900,
+   "pat": 18234
+  },
+  {
+   "period": "Q2FY26",
+   "period_end": "2025-09-30",
+   "revenue": 44120,
+   "ebitda": null,
+   "pbt": 20300,
+   "pat": 18640
+  }
+ ],
+ "IRCTC": [
+  {
+   "period": "Q4FY24",
+   "period_end": "2024-03-31",
+   "revenue": 1014,
+   "ebitda": 402,
+   "pbt": 350,
+   "pat": 271
+  },
+  {
+   "period": "Q1FY25",
+   "period_end": "2024-06-30",
+   "revenue": 938,
+   "ebitda": 356,
+   "pbt": 306,
+   "pat": 235
+  },
+  {
+   "period": "Q2FY25",
+   "period_end": "2024-09-30",
+   "revenue": 949,
+   "ebitda": 362,
+   "pbt": 312,
+   "pat": 240
+  },
+  {
+   "period": "Q3FY25",
+   "period_end": "2024-12-31",
+   "revenue": 964,
+   "ebitda": 371,
+   "pbt": 321,
+   "pat": 248
+  },
+  {
+   "period": "Q4FY25",
+   "period_end": "2025-03-31",
+   "revenue": 989,
+   "ebitda": 382,
+   "pbt": 331,
+   "pat": 256
+  },
+  {
+   "period": "Q1FY26",
+   "period_end": "2025-06-30",
+   "revenue": 977,
+   "ebitda": 378,
+   "pbt": 327,
+   "pat": 252
+  },
+  {
+   "period": "Q2FY26",
+   "period_end": "2025-09-30",
+   "revenue": 1017,
+   "ebitda": 396,
+   "pbt": 344,
+   "pat": 307
+  }
+ ],
+ "FEDERALBNK": [
+  {
+   "period": "Q4FY24",
+   "period_end": "2024-03-31",
+   "revenue": 5320,
+   "ebitda": null,
+   "pbt": 1250,
+   "pat": 950
+  },
+  {
+   "period": "Q1FY25",
+   "period_end": "2024-06-30",
+   "revenue": 5410,
+   "ebitda": null,
+   "pbt": 1280,
+   "pat": 972
+  },
+  {
+   "period": "Q2FY25",
+   "period_end": "2024-09-30",
+   "revenue": 5520,
+   "ebitda": null,
+   "pbt": 1320,
+   "pat": 1001
+  },
+  {
+   "period": "Q3FY25",
+   "period_end": "2024-12-31",
+   "revenue": 5640,
+   "ebitda": null,
+   "pbt": 1360,
+   "pat": 1030
+  },
+  {
+   "period": "Q4FY25",
+   "period_end": "2025-03-31",
+   "revenue": 5750,
+   "ebitda": null,
+   "pbt": 1400,
+   "pat": 1060
+  },
+  {
+   "period": "Q1FY26",
+   "period_end": "2025-06-30",
+   "revenue": 5830,
+   "ebitda": null,
+   "pbt": 1430,
+   "pat": 1082
+  },
+  {
+   "period": "Q2FY26",
+   "period_end": "2025-09-30",
+   "revenue": 5940,
+   "ebitda": null,
+   "pbt": 1470,
+   "pat": 1113
+  }
+ ]
+}

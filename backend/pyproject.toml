@@ -1,0 +1,37 @@
+[project]
+name = "finn-backend"
+version = "0.1.0"
+description = "FINN — a mobile-first financial investment agent built on Google ADK"
+readme = "../README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "google-adk>=2.14.0",
+    "litellm>=1.61.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "apscheduler>=3.10.4",
+    "yfinance>=0.2.50",
+    "pywebpush>=2.0.0",
+    "pypdf>=5.0.0",
+    "sqlmodel>=0.0.22",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "aiosqlite>=0.20.0",
+    "httpx>=0.27.0",
+    "beautifulsoup4>=4.12.0",
+    "requests>=2.32.0",
+    "python-dotenv>=1.0.1",
+    "pydantic>=2.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.uv]
+package = false

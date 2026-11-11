@@ -1,0 +1,314 @@
+[
+ {
+  "ticker": "PERSISTENT",
+  "category": "results",
+  "headline": "Persistent Systems announces Q2 FY26 results; Board approves financial results for the quarter ended September 30, 2025",
+  "body": "Revenue from operations Rs 3,207 crore, up 4.1% QoQ and 22.8% YoY. EBITDA margin at 19.2%.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "PERSISTENT",
+  "category": "management_change",
+  "headline": "Resignation of Chief Financial Officer - Mr. Sunil Sapre steps down; Mr. Piyush Pandey appointed as interim financial controller",
+  "body": "Mr. Sunil Sapre, CFO, has resigned effective November 30, 2025 to pursue an opportunity outside the organization.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "PERSISTENT",
+  "category": "earnings_call",
+  "headline": "Intimation of earnings conference call for Q2 FY26 financial results",
+  "body": "Conference call on October 23, 2025 at 5:00 PM IST. Dial-in details on the investor relations page.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "CROMPTON",
+  "category": "results",
+  "headline": "Crompton Greaves Consumer Electricals Ltd -Declaration of Audited Financial Results for the quarter and half year ended September 30, 2025",
+  "body": "Revenue Rs 2,112 crore, up 9.4% YoY. PAT Rs 168 crore.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "CROMPTON",
+  "category": "press_release",
+  "headline": "Crompton unveils new range of energy-efficient ceiling fans with BLDC motors",
+  "body": "Launches 14 new BLDC fan models targeting 35% of portfolio by FY27.",
+  "importance": 3,
+  "filed_at": ""
+ },
+ {
+  "ticker": "TITAN",
+  "category": "results",
+  "headline": "Titan Company Ltd - Board Meeting Intimation for approval of Un-Audited Financial Results for Q2 FY26",
+  "body": "Board meeting scheduled November 5, 2025 to consider quarterly results.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "TITAN",
+  "category": "dividend",
+  "headline": "Titan Company Ltd - Declared interim dividend of Rs 11 per share; record date fixed",
+  "body": "Interim dividend of Rs 11 per equity share. Record date: November 18, 2025.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "ASTRAL",
+  "category": "capex",
+  "headline": "Astral Ltd - Board approves capex of Rs 340 crore for new adhesive manufacturing capacity at Gujarat",
+  "body": "Greenfield adhesives plant, commissioned by FY28, taking adhesive capacity to 4.2 lakh TPA.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "ASTRAL",
+  "category": "credit_rating",
+  "headline": "Astral Ltd - CRISIL reaffirms credit rating at AAA/Stable for long-term bank facilities",
+  "body": "Rating agency CRISIL has reaffirmed AAA/Stable. No change in outlook.",
+  "importance": 3,
+  "filed_at": ""
+ },
+ {
+  "ticker": "RELIANCE",
+  "category": "insider_trading",
+  "headline": "RELIANCE - Disclosure under SEBI PIT regulations: promoter group acquisition of 12.4 lakh shares",
+  "body": "Promoter group acquired 12.4 lakh equity shares via open market between Nov 3-6, 2025.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "RELIANCE",
+  "category": "agm_egm",
+  "headline": "RELIANCE - EGM results: all resolutions passed with requisite majority",
+  "body": "Scrutinizer report for remote e-voting results of the Extraordinary General Meeting.",
+  "importance": 3,
+  "filed_at": ""
+ },
+ {
+  "ticker": "HDFCBANK",
+  "category": "results",
+  "headline": "HDFC Bank - Asset liabilities committee approves Q2 FY26 results filing with exchanges",
+  "body": "NII up 7.6% YoY. Deposits growth 15.2% YoY.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "HDFCBANK",
+  "category": "unclassified",
+  "headline": "HDFC Bank - Allotment of ESOP shares under Employee Stock Option Scheme",
+  "body": "2,84,500 equity shares allotted under ESOP on November 6, 2025.",
+  "importance": 4,
+  "filed_at": ""
+ },
+ {
+  "ticker": "HDFCBANK",
+  "category": "press_release",
+  "headline": "HDFC Bank launches instant digital business loans for MSMEs",
+  "body": "Paperless sanction in under 10 minutes via the business banking app.",
+  "importance": 3,
+  "filed_at": ""
+ },
+ {
+  "ticker": "TCS",
+  "category": "postal_ballot",
+  "headline": "TCS - Postal ballot results: resolution on reappointment passed",
+  "body": "99.4% votes in favour. Voting period ended November 4, 2025.",
+  "importance": 3,
+  "filed_at": ""
+ },
+ {
+  "ticker": "TCS",
+  "category": "investor_meetings",
+  "headline": "TCS - Schedule of analyst / institutional investor meetings",
+  "body": "Meetings with international institutional investors during November 10-14, 2025.",
+  "importance": 3,
+  "filed_at": ""
+ },
+ {
+  "ticker": "INFY",
+  "category": "fund_raise",
+  "headline": "Infosys - Board approves buyback of equity shares for an amount not exceeding Rs 9,300 crore",
+  "body": "Buyback via tender offer at Rs 1,950 per share, subject to shareholder approval.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "INFY",
+  "category": "unclassified",
+  "headline": "Infosys - Intimation of loss of share certificate and issuance of duplicate certificate",
+  "body": "Duplicate share certificate issued pursuant to shareholders' approval.",
+  "importance": 4,
+  "filed_at": ""
+ },
+ {
+  "ticker": "LT",
+  "category": "press_release",
+  "headline": "L&T - Power transmission and distribution business secures orders worth Rs 1,000-2,500 crore",
+  "body": "Orders in the Middle East and domestic smart-grid segments classified as 'major'.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "LT",
+  "category": "unclassified",
+  "headline": "L&T - Compliance certificate under SEBI regulations for the half year",
+  "body": "Certificate under Regulation 7(3) of SEBI (LODR) Regulations 2015.",
+  "importance": 4,
+  "filed_at": ""
+ },
+ {
+  "ticker": "FEDERALBNK",
+  "category": "management_change",
+  "headline": "The Federal Bank Ltd - Appointment of Mr. Kalyan Gurazada as Chief Financial Officer of the Bank",
+  "body": "The Board appointed Mr. Kalyan Gurazada as CFO effective November 14, 2025, succeeding Mr. Ashutosh Khajuria upon superannuation.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "FEDERALBNK",
+  "category": "pledging",
+  "headline": "Federal Bank - Release of shares pledged by promoter group",
+  "body": "3.2% of promoter holding released from pledge; remaining pledge now nil.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "ASIANPAINT",
+  "category": "litigation",
+  "headline": "Asian Paints - Order from Competition Commission of India; penalty imposed",
+  "body": "CCI order imposing penalty of Rs 685 crore; company evaluating appeal before NCLAT.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "ASIANPAINT",
+  "category": "unclassified",
+  "headline": "Asian Paints - Shareholding pattern for the quarter ended September 30, 2025",
+  "body": "Shareholding pattern filed under Regulation 31(1)(b).",
+  "importance": 4,
+  "filed_at": ""
+ },
+ {
+  "ticker": "SUPREMEIND",
+  "category": "capex",
+  "headline": "Supreme Industries - Commencement of commercial production at new polymer products facility",
+  "body": "",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "SUPREMEIND",
+  "category": "press_release",
+  "headline": "Supreme Industries - October 2025 monthly business update",
+  "body": "Pipes volume growth 8% YoY; molded furniture flat.",
+  "importance": 3,
+  "filed_at": ""
+ },
+ {
+  "ticker": "BHARATFORG",
+  "category": "results",
+  "headline": "Bharat Forge - Outcome of Board Meeting - Approved un-audited financial results for Q2 FY26",
+  "body": "Consolidated revenue Rs 4,271 crore, up 6% YoY.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "CAMPUS",
+  "category": "insider_trading",
+  "headline": "Campus Activewear - Purchase of shares by promoter group under SEBI (PIT) Regulations",
+  "body": "Promoter acquired 4.1 lakh shares via open market.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "CAMPUS",
+  "category": "press_release",
+  "headline": "Campus Activewear - Launches new athleisure sub-brand targeting women's segment",
+  "body": "New sub-brand with 120 SKUs across sports and athleisure.",
+  "importance": 3,
+  "filed_at": ""
+ },
+ {
+  "ticker": "GRANULES",
+  "category": "fund_raise",
+  "headline": "Granules India - Commercial paper issue of Rs 200 crore; issuance and allotment",
+  "body": "Commercial paper of Rs 200 crore allotted at 7.35% yield, 90-day tenor.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "GRANULES",
+  "category": "litigation",
+  "headline": "Granules India - USFDA classification for Gagillapur facility; 4 observations",
+  "body": "USFDA completed inspection with 4 procedural observations; no data integrity issues.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "NEULANDLAB",
+  "category": "results",
+  "headline": "Neuland Laboratories - Financial results updates for the quarter ended September 30, 2025",
+  "body": "Revenue Rs 261 crore, up 18% YoY on strong GLP-1 peptide demand.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "GRAVITA",
+  "category": "capex",
+  "headline": "Gravita India - Board approves expansion capex of Rs 300 crore for recycled lead capacity",
+  "body": "Capacity expansion from 1.5 lakh TPA to 2.1 lakh TPA by FY28.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "MOTHERSON",
+  "category": "M&A",
+  "headline": "Samvardhana Motherson - Acquisition of remaining 49% stake in joint venture entity",
+  "body": "Acquisition of the remaining 49% in the lighting JV for Rs 310 crore, making it a wholly owned subsidiary.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "IRCTC",
+  "category": "results",
+  "headline": "IRCTC - Outcome of Board Meeting - financial results for the quarter ended September 30, 2025",
+  "body": "Revenue Rs 1,017 crore, up 7.2% YoY. PAT Rs 307 crore.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "IRCTC",
+  "category": "dividend",
+  "headline": "IRCTC - Interim dividend Rs 5 per share; record date November 21, 2025",
+  "body": "Board declared interim dividend of Rs 5 per share.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "IRFC",
+  "category": "fund_raise",
+  "headline": "Indian Railway Finance Corporation - Commercial paper issuance of Rs 1,500 crore",
+  "body": "CP issued at 6.95% for a tenor of 175 days.",
+  "importance": 2,
+  "filed_at": ""
+ },
+ {
+  "ticker": "PAYTM",
+  "category": "management_change",
+  "headline": "One 97 Communications (Paytm) - CFO transition: new CFO appointment effective December 1, 2025",
+  "body": "Mr. Rajesh Kumar succeeds the outgoing CFO; outgoing CFO to support transition till year end.",
+  "importance": 1,
+  "filed_at": ""
+ },
+ {
+  "ticker": "SUZLON",
+  "category": "fund_raise",
+  "headline": "Suzlon Energy - Preferential allotment of convertible warrants to promoter group",
+  "body": "14.28 crore warrants at Rs 62 each, aggregating Rs 885 crore, to fund capex.",
+  "importance": 1,
+  "filed_at": ""
+ }
+]
