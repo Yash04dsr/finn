@@ -20,8 +20,13 @@ node_modules/
 out/
 next-env.d.ts
 
+# mobile (Expo)
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/.env.local
+
 # misc
 .DS_Store
 *.log
-mobile/
 frontend/tsconfig.tsbuildinfo
