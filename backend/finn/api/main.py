@@ -163,6 +163,8 @@ async def api_company(ticker: str):
     if ticker not in all_t:
         raise HTTPException(404, f"{ticker} not tracked")
     from ..tools import metrics as metrics_mod
+    from ..tools import guidance as guidance_mod
+    from ..tools import portfolio as pf  # noqa: F401 (median peers)
 
     snap = prices_ingest.price_snapshot(ticker)
     quarterly = db.quarterly_series(ticker, limit=8)
@@ -172,6 +174,26 @@ async def api_company(ticker: str):
         "annual_reports": db.chunk_count(ticker, "annual_report"),
         "results": db.chunk_count(ticker, "results_filing"),
     }
+    # Guidance scorecard + portfolio-relative context for the company page.
+    scorecard = guidance_mod.scorecard(ticker)
+    peer_yoy = []
+    for t in PORTFOLIO:
+        if t == ticker:
+            continue
+        s = db.quarterly_series(t, limit=8)
+        if len(s) >= 5:
+            g = guidance_mod._yoy_growth(s, s[-1]["period"])
+            if g is not None:
+                peer_yoy.append(g)
+    peer_yoy.sort()
+    median_yoy = peer_yoy[len(peer_yoy) // 2] if peer_yoy else None
+    latest = quarterly[-1] if quarterly else None
+    yoy = None
+    if latest and len(quarterly) >= 5:
+        yq = latest["period"][:2]
+        year_ago = next((r for r in quarterly if r["period"][:2] == yq and r["period"] != latest["period"]), None)
+        if year_ago and year_ago.get("revenue") and latest.get("revenue"):
+            yoy = round((latest["revenue"] - year_ago["revenue"]) / year_ago["revenue"] * 100, 1)
     return {
         "ticker": ticker,
         "snapshot": snap,
@@ -179,6 +201,8 @@ async def api_company(ticker: str):
         "filings": [{"id": f["id"], "category": f["category"], "headline": f["headline"],
                      "filed_at": f["filed_at"]} for f in filings],
         "chunk_stats": chunk_stats,
+        "guidance_scorecard": scorecard,
+        "portfolio_context": {"revenue_yoy": yoy, "portfolio_median_yoy": median_yoy},
     }
 
 

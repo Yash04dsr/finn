@@ -9,6 +9,7 @@ import { pct, rupees, shortDate } from "@/lib/format";
 import Header from "@/components/Header";
 import RevenueChart from "@/components/RevenueChart";
 import CategoryChip from "@/components/CategoryChip";
+import GuidanceScorecard from "@/components/GuidanceScorecard";
 import { ListSkeleton, ErrorRow } from "@/components/Skeleton";
 import { toneFor } from "@/lib/format";
 
@@ -93,15 +94,26 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
             ))}
           </div>
 
-          <div className="px-4 pt-3.5">
+          <div className="space-y-3 px-4 pt-3.5">
             {tab === "overview" ? (
-              <div className="card p-4">
-                <div className="mb-2 flex items-baseline justify-between">
-                  <h2 className="text-[12.5px] font-semibold text-[#E8ECF3]">Quarterly revenue · EBITDA margin</h2>
-                  <span className="text-[10.5px] text-[#8B93A3]">last 8 quarters</span>
+              <>
+                <div className="card p-4">
+                  <div className="mb-2 flex items-baseline justify-between">
+                    <h2 className="text-[12.5px] font-semibold text-[#E8ECF3]">Quarterly revenue · EBITDA margin</h2>
+                    <span className="text-[10.5px] text-[#8B93A3]">last 8 quarters</span>
+                  </div>
+                  <RevenueChart quarterly={c.quarterly} />
                 </div>
-                <RevenueChart quarterly={c.quarterly} />
-              </div>
+                {c.portfolio_context?.revenue_yoy != null && c.portfolio_context?.portfolio_median_yoy != null && (
+                  <PortfolioContext
+                    yoy={c.portfolio_context.revenue_yoy}
+                    median={c.portfolio_context.portfolio_median_yoy}
+                  />
+                )}
+                {c.guidance_scorecard && c.guidance_scorecard.claims.length > 0 && (
+                  <GuidanceScorecard data={c.guidance_scorecard} />
+                )}
+              </>
             ) : (
               <FilingsList filings={c.filings} />
             )}
@@ -125,6 +137,27 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
         </>
       )}
     </main>
+  );
+}
+
+/** Portfolio-relative growth line: how this quarter's YoY compares to the book. */
+function PortfolioContext({ yoy, median }: { yoy: number; median: number }) {
+  const delta = Math.round((yoy - median) * 10) / 10;
+  const ahead = delta >= 0;
+  return (
+    <div className="card flex items-center gap-3 p-3.5">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={1.8} className="h-4 w-4 shrink-0" aria-hidden="true">
+        <path d="M4 19h16M6 16V9m4 7V5m4 11v-4m4 4V8" strokeLinecap="round" />
+      </svg>
+      <p className="num text-[12px] leading-snug text-[#8B93A3]">
+        Latest revenue <b className="text-[#E8ECF3]">{yoy > 0 ? "+" : ""}{yoy.toFixed(1)}% YoY</b> vs{" "}
+        <b className="text-[#E8ECF3]">{median > 0 ? "+" : ""}{median.toFixed(1)}%</b> portfolio median —{" "}
+        <b style={{ color: ahead ? "#34D399" : "#FB7185" }}>
+          {ahead ? `${delta.toFixed(1)} pts ahead` : `${Math.abs(delta).toFixed(1)} pts behind`}
+        </b>{" "}
+        of your 17-company book.
+      </p>
+    </div>
   );
 }
 

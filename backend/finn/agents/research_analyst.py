@@ -17,7 +17,7 @@ from google.adk.tools import FunctionTool
 
 from ..config import MODEL_REASONING
 from ..llm import routing
-from ..tools import filings_rag, metrics, prices
+from ..tools import filings_rag, guidance, metrics, prices
 
 INSTRUCTION = """You are FINN's Research Analyst: a rigorous, primary-source-only equity analyst.
 
@@ -38,7 +38,8 @@ INSTRUCTION = """You are FINN's Research Analyst: a rigorous, primary-source-onl
 1. Call doc_overview(ticker) to see what primary sources exist.
 2. Pull targeted passages with search_docs (2-4 calls max, vary the phrasing).
 3. Call quarterly_metrics(ticker) for the numbers.
-4. Synthesise: answer the question directly, cite as you go, flag what's missing."""
+4. For guidance/accountability questions ("are they delivering?", "did they keep their word?"), call guidance_scorecard(ticker): it deterministically extracts management's committed numbers from transcripts and grades them against delivered results. Quote the claimed band vs delivered number and cite the claim's source.
+5. Synthesise: answer the question directly, cite as you go, flag what's missing."""
 
 
 def _fmt_crore(v) -> str:
@@ -101,6 +102,7 @@ def build_research_analyst() -> LlmAgent:
             FunctionTool(func=quarterly_metrics),
             FunctionTool(func=prices.price_context_wrapped),
             FunctionTool(func=filings_rag.doc_overview_wrapped),
+            FunctionTool(func=guidance.scorecard_wrapped),
         ],
         generate_content_config={"temperature": 0.2, "max_output_tokens": 1200},
         disallow_transfer_to_parent=True,

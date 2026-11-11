@@ -245,6 +245,25 @@ def chunk_count(ticker: str | None = None, doc_type: str | None = None) -> int:
         return c.execute(q, args).fetchone()[0]
 
 
+def chunks_for(ticker: str, doc_type: str | None = None, limit: int = 40) -> list[dict]:
+    """All chunks for a ticker (newest id first) — the no-query fallback for
+    claim mining when FTS terms don't match."""
+    with db() as c:
+        if doc_type:
+            rows = c.execute(
+                "SELECT id, ticker, doc_type, doc_title, period, url, seq, text"
+                " FROM chunks WHERE ticker=? AND doc_type=? ORDER BY id DESC LIMIT ?",
+                (ticker, doc_type, limit),
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT id, ticker, doc_type, doc_title, period, url, seq, text"
+                " FROM chunks WHERE ticker=? ORDER BY id DESC LIMIT ?",
+                (ticker, limit),
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
 # --- prices ---------------------------------------------------------------------
 
 def put_price(ticker: str, date: str, close: float, volume: float) -> None:

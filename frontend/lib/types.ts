@@ -104,12 +104,34 @@ export interface ChunkStats {
   results?: number;
 }
 
+export interface GuidanceClaim {
+  kind: "revenue_growth" | "ebitda_margin" | "ebitda_exit_margin";
+  claim_period: string;
+  claimed: { lo: number; hi: number; quote: string; unit: string };
+  delivered_period?: string | null;
+  verdict: "ahead" | "on_track" | "behind" | "pending" | "unverifiable";
+  delivered?: number | null;
+  gap?: number | null;
+  within?: [number, number] | null;
+  source: { chunk_id: number; doc_title: string; period: string; url: string; excerpt: string };
+}
+
+export interface GuidanceScorecard {
+  ticker: string;
+  delivered_period?: string | null;
+  claims: GuidanceClaim[];
+  streak: { ahead: number; on_track: number; behind: number };
+  credibility: "Strong" | "Watch" | "Challenged";
+}
+
 export interface CompanyResponse {
   ticker: string;
   snapshot?: { close: number; change_pct: number; date: string } | null;
   quarterly: QuarterlyRow[];
   filings: FilingSummary[];
   chunk_stats: ChunkStats;
+  guidance_scorecard?: GuidanceScorecard;
+  portfolio_context?: { revenue_yoy: number | null; portfolio_median_yoy: number | null };
 }
 
 export interface TickerQuote {
