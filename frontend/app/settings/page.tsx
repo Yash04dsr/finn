@@ -19,7 +19,7 @@ export default function SettingsPage() {
         <CostDashboard />
         <OpsCard />
         <p className="mt-6 text-center text-[11px] leading-relaxed text-[#5A6373]">
-          FINN · investment intelligence agent · ENAM assignment build
+          FINN · investment intelligence · built on Google ADK
         </p>
       </div>
       <ToastHost />
