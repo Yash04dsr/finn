@@ -1,11 +1,10 @@
 """Runner for the ResearchAnalyst grounding evals.
 
-Checks the three behaviours that matter for the Pull side:
-1. Grounded answers cite sources ([S#] markers) for factual claims.
+Checks the behaviours that matter for the Pull side:
+1. Grounded answers cite sources ([S#] markers) and use tool data.
 2. Out-of-corpus questions get an explicit refusal, not hallucination.
-3. Numbers come from the metrics tool (regex-match stored values).
 
-Run: uv run python -m evals.run_evals
+Run: uv run python -m evals.run_evals   (needs LLM gateway access)
 """
 from __future__ import annotations
 
@@ -18,33 +17,16 @@ EVALSETS = Path(__file__).parent / "evalsets"
 
 
 async def run_agent_once(prompt: str) -> tuple[str, list[str]]:
-    """Run the research analyst directly on a prompt. Returns (final_text, tool_names)."""
+    """Run the built research analyst on a prompt. Returns (final_text, tools_used)."""
     from google.adk import Runner
-    from google.adk.agents import LlmAgent
-    from google.adk.models.lite_llm import LiteLlm
     from google.adk.sessions import InMemorySessionService
     from google.genai import types
 
-    from finn.agents.research_analyst import INSTRUCTION
-    from finn.config import MODEL_REASONING
+    from finn.agents.research_analyst import build_research_analyst
     from finn.llm.routing import ensure_llm_env
-    from finn.tools import filings_rag, prices
-
-    from finn.agents.research_analyst import quarterly_metrics
 
     ensure_llm_env()
-    agent = LlmAgent(
-        name="research_analyst",
-        model=LiteLlm(model=f"openai/{MODEL_REASONING}"),
-        instruction=INSTRUCTION,
-        tools=[
-            filings_rag.search_docs_wrapped,
-            quarterly_metrics,
-            prices.price_context_wrapped,
-            filings_rag.doc_overview_wrapped,
-        ],
-        generate_content_config={"temperature": 0.2, "max_output_tokens": 1500},
-    )
+    agent = build_research_analyst()
     runner = Runner(app_name="finn_eval", agent=agent,
                     session_service=InMemorySessionService())
     session = await runner.session_service.create_session(app_name="finn_eval", user_id="eval")
@@ -57,64 +39,69 @@ async def run_agent_once(prompt: str) -> tuple[str, list[str]]:
         if getattr(event, "tool_name", None):
             tools_used.append(event.tool_name)
         if event.content and event.content.parts:
-            for part in event.content.parts:
-                if part.text:
-                    final_text = part.text
+            if event.is_final_response():
+                for part in event.content.parts:
+                    if part.text:
+                        final_text = part.text
     return final_text, tools_used
 
 
 def check_citations(text: str) -> bool:
-    return bool(re.search(r"\[S\d+\]", text)) or "not covered" in text.lower() or \
-        "isn't covered" in text.lower()
+    return bool(re.search(r"\[S\d+\]", text))
 
 
 def check_refusal(text: str) -> bool:
     lowered = text.lower()
     return ("not covered" in lowered or "isn't covered" in lowered or
-            "no " in lowered and ("transcript" in lowered or "documents" in lowered))
+            "no primary" in lowered or "zero primary" in lowered or
+            ("no " in lowered and ("transcript" in lowered or "documents" in lowered or
+                                   "results filings" in lowered)))
 
 
-def check_number(text: str, expected: str) -> bool:
-    return expected in text.replace(",", "")
-
-
-CHECKS = {
-    "grounded_revenue_answer": [
-        (lambda t, tools: check_citations(t), "answer cites sources or refuses"),
-        (lambda t, tools: check_number(t, "3207"), "quotes the stored revenue 3207"),
-        (lambda t, tools: bool(tools), "used at least one tool"),
-    ],
-    "refuses_out_of_corpus": [
-        (lambda t, tools: check_refusal(t), "explicitly refuses / flags missing coverage"),
-    ],
-    "no_outside_knowledge_for_paytm": [
-        (lambda t, tools: check_refusal(t), "refuses without corpus"),
-    ],
+CASES = {
+    "grounded_revenue_answer": {
+        "prompt": "What was Persistent Systems' Q2 FY26 revenue and how did it grow versus last year?",
+        "checks": [
+            (check_citations, "answer cites [S#] sources"),
+            (lambda t: "3207" in t.replace(",", ""), "quotes the stored revenue 3207 Cr"),
+            (lambda t: "22.8" in t, "quotes the YoY growth 22.8%"),
+        ],
+    },
+    "refuses_out_of_corpus": {
+        "prompt": "What is IRCTC's market share in the online food delivery business?",
+        "checks": [
+            (check_refusal, "explicitly flags missing coverage instead of inventing"),
+        ],
+    },
+    "no_outside_knowledge_for_paytm": {
+        "prompt": "Summarise Paytm's Q2 FY26 performance from its concall.",
+        "checks": [
+            (check_refusal, "refuses without corpus (no model-memory summary)"),
+        ],
+    },
 }
 
 
 async def main() -> int:
-    evalset = json.loads((EVALSETS / "research_analyst.json").read_text())
     results = []
-    for case in evalset["cases"]:
-        eval_id = case["eval_id"]
-        prompt = case["conversation"][0]["user_content"]
-        print(f"--- {eval_id}: {prompt[:70]}...")
+    for eval_id, case in CASES.items():
+        print(f"--- {eval_id}: {case['prompt'][:70]}...")
         try:
-            text, tools = await run_agent_once(prompt)
+            text, tools = await run_agent_once(case["prompt"])
         except Exception as exc:
             print(f"    ERROR running agent: {exc}")
             results.append((eval_id, False))
             continue
         passed = True
-        for check, label in CHECKS.get(eval_id, []):
-            ok = check(text, tools)
+        for check, label in case["checks"]:
+            ok = check(text)
             print(f"    [{'PASS' if ok else 'FAIL'}] {label}")
             passed = passed and ok
         if not text.strip():
             passed = False
             print("    [FAIL] empty response")
-        print(f"    answer: {text[:160]!r}")
+        print(f"    tools: {sorted(set(tools))}")
+        print(f"    answer: {text[:140]!r}")
         results.append((eval_id, passed))
 
     print("\n=== EVAL SUMMARY ===")

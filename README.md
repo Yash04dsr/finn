@@ -8,7 +8,13 @@ sources — annual reports, concall transcripts, results filings — with citati
 Built on **Google's Agent Development Kit (ADK) v2.14** (multi-agent: a routing coordinator plus a
 grounded ResearchAnalyst), with deliberate **two-tier model routing** and a live **cost ledger**.
 
-## Quick start (2 minutes)
+## Clients
+
+- **Expo app** (`mobile/`) — the primary experience: iOS/Android via Expo Go or a
+  published build, native push notifications through Expo push.
+- **Next.js PWA** (`frontend/`) — no-install web fallback, same API, same design.
+
+## Quick start (3 minutes)
 
 ```bash
 # 1. Backend (Python 3.12+, uv)
@@ -19,13 +25,14 @@ uv run python -m finn.ingest.seed          # write demo snapshots
 uv run python -m finn.ingest.seed_docs     # seed hero-company transcripts
 uv run uvicorn finn.api.main:app --port 8000
 
-# 2. Frontend (Node 20+)
-cd ../frontend
+# 2. Expo app (Node 20+)
+cd ../mobile
 npm install
-npm run dev                  # http://localhost:3000  (proxies /api to :8000)
+npx expo start               # scan the QR with Expo Go (same Wi-Fi as this machine)
+# in the app: Settings → set Backend URL to http://<your-lan-ip>:8000
 ```
 
-Open `http://localhost:3000` on your phone (same Wi-Fi: `http://<your-ip>:3000`).
+Web fallback: `cd frontend && npm install && npm run dev` → http://localhost:3000.
 In **Settings → Ops**, tap **Run demo pipeline** to trigger one full Push cycle
 (ingest → classify → enrich → thresholds → digest). Then read the feed.
 
@@ -64,14 +71,15 @@ backend/
   finn/agent.py               # ADK root agent + sub-agent wiring
   finn/agents/                # ResearchAnalyst (grounded), DigestWriter
   finn/tools/                 # RAG (FTS5), metrics math, prices, portfolio
-  finn/alerts/                # classifier, threshold engine, digest, web-push
+  finn/alerts/                # classifier, threshold engine, digest, Expo/web push
   finn/ingest/                # NSE feed (+snapshot), yfinance, screener, PDF chunker
   finn/api/main.py            # FastAPI: SSE chat over ADK Runner + REST
   finn/pipeline.py            # one EOD pass, end to end
   finn/scheduler.py           # APScheduler (18:30 IST, Mon–Fri)
   tests/                      # 24 pytest cases (math, thresholds, classifier, FTS)
   evals/                      # grounding evals: cite-or-refuse contract
-frontend/                     # Next.js 15 PWA (app router, Tailwind, zero runtime bloat)
+mobile/                       # Expo (React Native) app — primary client
+frontend/                     # Next.js 15 PWA — fallback web client
 docs/                         # ARCHITECTURE, DECISIONS, demo-script, WRITEUP
 ```
 
