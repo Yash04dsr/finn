@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: finn-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: "pip install uv && uv sync --frozen"
+    startCommand: "uv run uvicorn finn.api.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/settings
+    envVars:
+      - key: HYDE_API_KEY
+        sync: false
+      - key: FINN_MODEL_FAST
+        value: hyde/glm-5.3-flash
+      - key: FINN_MODEL_REASONING
+        value: hyde/glm-5.3-flash
+      - key: PYTHON_VERSION
+        value: "3.12"
