@@ -50,11 +50,11 @@ export default function FeedPage() {
             role="tab"
             aria-selected={hours === w.hours}
             onClick={() => setHours(w.hours)}
-            className="num press rounded-full border px-3.5 py-1.5 text-[12px] font-semibold transition-colors"
+            className="num press border px-3.5 py-1.5 text-[12px] font-semibold transition-colors"
             style={
               hours === w.hours
                 ? { background: "rgba(16,185,129,0.14)", borderColor: "rgba(16,185,129,0.4)", color: "#1E6B4F" }
-                : { borderColor: "rgba(255,255,255,0.07)", color: "#6E675C", background: "#FFFDF8" }
+                : { borderColor: "rgba(255,255,255,0.07)", color: "#4B5563", background: "#FFFFFF" }
             }
           >
             {w.label}
@@ -118,7 +118,7 @@ export default function FeedPage() {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6E675C]">{children}</h2>
+    <h2 className="mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4B5563]">{children}</h2>
   );
 }
 
@@ -128,13 +128,13 @@ function EmptyState({ onRun }: { onRun: () => void }) {
       <svg viewBox="0 0 24 24" fill="none" stroke="#1E6B4F" strokeWidth={1.5} className="h-9 w-9 opacity-80" aria-hidden="true">
         <path d="M3 12h4l2.5-7 4 14 2.5-7H21" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <p className="mt-3 text-[15px] font-semibold text-[#1F1B16]">A quiet day in your portfolio</p>
-      <p className="mt-1.5 max-w-[260px] text-[12.5px] leading-relaxed text-[#6E675C]">
+      <p className="mt-3 text-[15px] font-semibold text-[#000000]">A quiet day in your portfolio</p>
+      <p className="mt-1.5 max-w-[260px] text-[12.5px] leading-relaxed text-[#4B5563]">
         No filings or anomalies crossed your thresholds in this window. Generate a demo day to see how FINN ranks a busy one.
       </p>
       <button
         onClick={onRun}
-        className="press mt-4 rounded-full bg-[#1E6B4F] px-5 py-2.5 text-[13px] font-semibold text-[#F6F1E7]"
+        className="press mt-4 bg-[#1E6B4F] px-5 py-2.5 text-[13px] font-semibold text-[#FFFFFF]"
       >
         Run demo pipeline
       </button>

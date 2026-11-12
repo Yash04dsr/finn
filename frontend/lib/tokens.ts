@@ -1,14 +1,17 @@
 // ─── Design tokens ───────────────────────────────────────────────────────────
-// Research-desk editorial palette: warm paper, ink, bottle green, oxblood.
+// Swiss International Style: black on white, one tan accent, square corners.
+// Data semantics (pos/neg) are the single concession to finance convention.
 
 export const T = {
-  bg: "#F6F1E7",
-  surface: "#FFFDF8",
-  surfaceHi: "#F3EDE2",
-  border: "rgba(31,27,22,0.12)",
-  text: "#1F1B16",
-  muted: "#6E675C",
-  accent: "#1E6B4F",
+  bg: "#FFFFFF",
+  surface: "#FFFFFF",
+  surfaceHi: "#F5F1E8",
+  border: "#E5E7EB",
+  borderStrong: "#000000",
+  text: "#000000",
+  muted: "#4B5563",
+  accent: "#000000",
+  accentHover: "#B38B6D",
   red: "#B4442C",
-  amber: "#B07C24",
+  amber: "#B38B6D",
 } as const;

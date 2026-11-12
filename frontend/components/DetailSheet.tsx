@@ -36,7 +36,7 @@ export default function DetailSheet({ alert, onClose }: { alert: Alert | null; o
         <div className="px-4 pb-2 pt-1">
           <div className="flex items-center gap-2">
             <TickerBadge ticker={alert.ticker} />
-            <span className="num text-[11px] text-[#6E675C]">{relTime(alert.created_at)}</span>
+            <span className="num text-[11px] text-[#4B5563]">{relTime(alert.created_at)}</span>
           </div>
 
           {alert.kind === "announcement" && (
@@ -60,7 +60,7 @@ export default function DetailSheet({ alert, onClose }: { alert: Alert | null; o
                     : `Why is ${alert.ticker} moving like this, and is it noise or signal?`
                 )
               }
-              className="press mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1E6B4F] py-3 text-[14px] font-semibold text-[#F6F1E7]"
+              className="press mt-4 flex w-full items-center justify-center gap-2 rounded-none bg-[#1E6B4F] py-3 text-[14px] font-semibold text-[#FFFFFF]"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
                 <path d="M12 2.5l1.9 5.1a2 2 0 0 0 1.2 1.2l5.1 1.9-5.1 1.9a2 2 0 0 0-1.2 1.2L12 18.9l-1.9-5.1a2 2 0 0 0-1.2-1.2L3.8 10.7l5.1-1.9a2 2 0 0 0 1.2-1.2L12 2.5Z" />
@@ -75,7 +75,7 @@ export default function DetailSheet({ alert, onClose }: { alert: Alert | null; o
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="mb-1.5 mt-4 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#6E675C]">{children}</p>;
+  return <p className="mb-1.5 mt-4 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#4B5563]">{children}</p>;
 }
 
 function AnnouncementBody({
@@ -94,13 +94,13 @@ function AnnouncementBody({
     <>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <CategoryChip category={p.category} />
-        {p.filed_at && <span className="num text-[11px] text-[#6E675C]">filed {relTime(p.filed_at)}</span>}
+        {p.filed_at && <span className="num text-[11px] text-[#4B5563]">filed {relTime(p.filed_at)}</span>}
       </div>
 
-      <h2 className="mt-2 text-[16px] font-bold leading-snug text-[#1F1B16]">{p.headline}</h2>
+      <h2 className="mt-2 text-[16px] font-bold leading-snug text-[#000000]">{p.headline}</h2>
 
       {p.summary && (
-        <div className="mt-3 rounded-xl border border-[#1E6B4F]/20 bg-[#1E6B4F]/[0.06] p-3">
+        <div className="mt-3 rounded-none border border-[#1E6B4F]/20 bg-[#1E6B4F]/[0.06] p-3">
           <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#1E6B4F]">
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3" aria-hidden="true">
               <path d="M12 2.5l1.9 5.1a2 2 0 0 0 1.2 1.2l5.1 1.9-5.1 1.9a2 2 0 0 0-1.2 1.2L12 18.9l-1.9-5.1a2 2 0 0 0-1.2-1.2L3.8 10.7l5.1-1.9a2 2 0 0 0 1.2-1.2L12 2.5Z" />
@@ -135,7 +135,7 @@ function AnnouncementBody({
               /* popup blocked */
             }
           }}
-          className="press mt-3 w-full rounded-xl border border-[#1F1B16]/[0.12] py-2.5 text-[12.5px] font-medium text-[#6E675C]"
+          className="press mt-3 w-full rounded-none border border-[#000000]/[0.12] py-2.5 text-[12.5px] font-medium text-[#4B5563]"
         >
           {clickedUrl ? "Opening source filing…" : "View source filing"}
         </button>
@@ -148,33 +148,33 @@ function AnomalyBody({ p, kind }: { p: VolumeOrPricePayload; kind: "volume_spike
   const isVol = kind === "volume_spike";
   return (
     <>
-      <h2 className="mt-2 text-[16px] font-bold leading-snug text-[#1F1B16]">
+      <h2 className="mt-2 text-[16px] font-bold leading-snug text-[#000000]">
         {isVol ? "Unusual volume" : "Sharp price move"}
       </h2>
-      <div className="mt-3 flex items-center gap-4 rounded-xl border border-[#1F1B16]/[0.12] bg-[#1F1B16]/[0.03] p-4">
+      <div className="mt-3 flex items-center gap-4 rounded-none border border-[#000000]/[0.12] bg-[#000000]/[0.03] p-4">
         <div>
-          <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#6E675C]">{isVol ? "Observed" : "Move"}</p>
-          <p className="num mt-1 text-[22px] font-bold" style={{ color: isVol ? "#B07C24" : (p.change_pct ?? 0) < 0 ? "#B4442C" : "#1E6B4F" }}>
+          <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#4B5563]">{isVol ? "Observed" : "Move"}</p>
+          <p className="num mt-1 text-[22px] font-bold" style={{ color: isVol ? "#B38B6D" : (p.change_pct ?? 0) < 0 ? "#B4442C" : "#1E6B4F" }}>
             {isVol ? times(p.value, 2) : pct(p.change_pct ?? p.value)}
           </p>
         </div>
-        <div className="border-l border-[#1F1B16]/[0.12] pl-4">
-          <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#6E675C]">Your threshold</p>
-          <p className="num mt-1 text-[22px] font-bold text-[#6E675C]">
+        <div className="border-l border-[#000000]/[0.12] pl-4">
+          <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#4B5563]">Your threshold</p>
+          <p className="num mt-1 text-[22px] font-bold text-[#4B5563]">
             {isVol ? times(p.threshold, 2) : `±${(p.threshold ?? 0).toFixed(1)}%`}
           </p>
         </div>
         {p.close != null && (
           <div className="ml-auto text-right">
-            <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#6E675C]">Close</p>
-            <p className="num mt-1 text-[15px] font-bold text-[#1F1B16]">{rupees(p.close)}</p>
+            <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[#4B5563]">Close</p>
+            <p className="num mt-1 text-[15px] font-bold text-[#000000]">{rupees(p.close)}</p>
           </div>
         )}
       </div>
       {Array.isArray(p.closes) && p.closes.length > 2 && (
         <>
           <SectionLabel>Recent closes</SectionLabel>
-          <div className="rounded-xl border border-[#1F1B16]/[0.12] bg-[#1F1B16]/[0.03] p-3">
+          <div className="rounded-none border border-[#000000]/[0.12] bg-[#000000]/[0.03] p-3">
             <Sparkline data={p.closes} width={320} height={64} className="w-full" />
           </div>
         </>
@@ -186,8 +186,8 @@ function AnomalyBody({ p, kind }: { p: VolumeOrPricePayload; kind: "volume_spike
 function DigestBody({ p }: { p: DigestPayload }) {
   return (
     <>
-      <h2 className="mt-2 text-[16px] font-bold leading-snug text-[#1F1B16]">{p.title}</h2>
-      <p className="num mt-1 text-[11.5px] text-[#6E675C]">
+      <h2 className="mt-2 text-[16px] font-bold leading-snug text-[#000000]">{p.title}</h2>
+      <p className="num mt-1 text-[11.5px] text-[#4B5563]">
         {p.window_hours}h window · {p.stats.shown} shown · {p.stats.hidden} collapsed
       </p>
       <div className="mt-3 space-y-2.5">
@@ -202,17 +202,17 @@ function DigestBody({ p }: { p: DigestPayload }) {
 function WhyDisclosure({ why }: { why: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-[#1F1B16]/[0.12]">
-      <button onClick={() => setOpen((o) => !o)} className="press flex w-full items-center gap-2 bg-[#1F1B16]/[0.03] px-3 py-2.5 text-left">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth={1.8} className="h-3.5 w-3.5" aria-hidden="true">
+    <div className="mt-4 overflow-hidden rounded-none border border-[#000000]/[0.12]">
+      <button onClick={() => setOpen((o) => !o)} className="press flex w-full items-center gap-2 bg-[#000000]/[0.03] px-3 py-2.5 text-left">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4B5563" strokeWidth={1.8} className="h-3.5 w-3.5" aria-hidden="true">
           <circle cx="12" cy="12" r="9" />
           <path d="M9.6 9a2.5 2.5 0 0 1 4.9.8c0 1.6-2.5 2-2.5 3.4M12 16.6v.1" strokeLinecap="round" />
         </svg>
-        <span className="text-[12px] font-medium text-[#6E675C]">Why am I seeing this?</span>
+        <span className="text-[12px] font-medium text-[#4B5563]">Why am I seeing this?</span>
         <svg
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#6E675C"
+          stroke="#4B5563"
           strokeWidth={2}
           className={`ml-auto h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
           aria-hidden="true"
@@ -220,7 +220,7 @@ function WhyDisclosure({ why }: { why: string }) {
           <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
-      {open && <p className="border-t border-[#1F1B16]/[0.08] px-3 py-2.5 text-[12.5px] leading-relaxed text-[#6E675C]">{why}</p>}
+      {open && <p className="border-t border-[#000000]/[0.08] px-3 py-2.5 text-[12.5px] leading-relaxed text-[#4B5563]">{why}</p>}
     </div>
   );
 }

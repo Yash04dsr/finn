@@ -18,23 +18,23 @@ export default function AlertRow({ alert, onOpen }: { alert: Alert; onOpen: (a: 
   return (
     <button
       onClick={() => onOpen(alert)}
-      className="press card flex w-full items-stretch gap-3 p-3.5 text-left hover:border-[#1F1B16]/[0.22]"
+      className="press card flex w-full items-stretch gap-3 p-3.5 text-left"
     >
       <span className="lead-bar" style={{ background: railColor(alert.priority) }} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <TickerBadge ticker={alert.ticker} />
           {alert.kind === "announcement" && <CategoryChip category={p.category as string} />}
-          <span className="num ml-auto shrink-0 text-[11px] text-[#6E675C]">{relTime(alert.created_at)}</span>
+          <span className="num ml-auto shrink-0 text-[11px] text-[#4B5563]">{relTime(alert.created_at)}</span>
         </div>
-        <p className="mt-1.5 line-clamp-2 text-[13.5px] font-medium leading-snug text-[#1F1B16]">{headline}</p>
+        <p className="mt-1.5 line-clamp-2 text-[13.5px] font-medium leading-snug text-black">{headline}</p>
         {alert.kind === "announcement" && typeof p.summary === "string" && p.summary && (
-          <p className="mt-1 line-clamp-1 text-[12px] leading-snug text-[#6E675C]">{p.summary}</p>
+          <p className="mt-1 line-clamp-1 text-[12px] leading-snug text-[#4B5563]">{p.summary}</p>
         )}
         {anomalyExtra(alert)}
       </div>
-      <svg viewBox="0 0 24 24" fill="none" stroke="#B9AE99" strokeWidth={2} className="mt-1 h-4 w-4 shrink-0 self-start" aria-hidden="true">
-        <path d="m9 5 7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="#808080" strokeWidth={2} className="mt-1 h-4 w-4 shrink-0 self-start" aria-hidden="true">
+        <path d="m9 5 7 7-7 7" strokeLinecap="square" />
       </svg>
     </button>
   );
@@ -42,16 +42,16 @@ export default function AlertRow({ alert, onOpen }: { alert: Alert; onOpen: (a: 
 
 export function TickerBadge({ ticker }: { ticker: string }) {
   return (
-    <span className="num rounded-md bg-[#1F1B16]/[0.06] px-1.5 py-0.5 text-[11.5px] font-bold tracking-wide text-[#1F1B16]">
+    <span className="num border border-black bg-black px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-white">
       {ticker}
     </span>
   );
 }
 
 export function railColor(priority: number): string {
-  if (priority <= 1) return "#B4442C";
-  if (priority === 2) return "#B07C24";
-  return "rgba(138, 130, 114, 0.4)";
+  if (priority <= 1) return "#000000";
+  if (priority === 2) return "#B38B6D";
+  return "#E5E7EB";
 }
 
 function anomalyLine(a: Alert): string {
@@ -74,10 +74,10 @@ function anomalyExtra(a: Alert): React.ReactNode {
   return (
     <div className="mt-2 flex items-center gap-2.5">
       {Array.isArray(p.closes) && p.closes.length > 2 ? <Sparkline data={p.closes} width={64} height={22} /> : null}
-      <span className="num text-[11.5px] text-[#6E675C]">
+      <span className="num text-[11.5px] text-[#4B5563]">
         {isVol ? (
           <>
-            <span className="font-semibold text-[#B07C24]">{times(p.value)}</span>
+            <span className="font-semibold text-black">{times(p.value)}</span>
             <span> observed · your threshold {times(p.threshold)}</span>
           </>
         ) : (

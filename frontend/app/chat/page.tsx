@@ -172,7 +172,7 @@ function ChatInner() {
       {/* Suggested prompts */}
       {messages.length === 0 && (
         <div className="px-4 pt-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6E675C]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4B5563]">
             {ticker ? `Researching ${ticker}` : "Try asking"}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -180,7 +180,7 @@ function ChatInner() {
               <button
                 key={s.label}
                 onClick={() => void send(s.prompt)}
-                className="press rounded-full border border-[#1F1B16]/[0.12] bg-[#FFFDF8] px-3 py-1.5 text-[12px] font-medium text-[#3D382F]"
+                className="press border border-[#000000]/[0.12] bg-[#FFFFFF] px-3 py-1.5 text-[12px] font-medium text-[#000000]"
               >
                 {s.label}
               </button>
@@ -198,7 +198,7 @@ function ChatInner() {
 
       {/* Composer */}
       <div
-        className="sticky bottom-0 border-t border-[#1F1B16]/[0.12] bg-[#F6F1E7]/94 backdrop-blur-md"
+        className="sticky bottom-0 border-t border-[#000000]/[0.12] bg-[#FFFFFF]/94 backdrop-blur-md"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
       >
         <div className="mx-auto flex w-full max-w-[480px] items-end gap-2 px-3 pt-2.5">
@@ -212,24 +212,24 @@ function ChatInner() {
             }}
             onKeyDown={onKeyDown}
             placeholder={ticker ? `Ask FINN about ${ticker}…` : "Ask FINN anything…"}
-            className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-xl border border-[#1F1B16]/[0.12] bg-[#FFFDF8] px-3.5 py-2.5 text-[14px] leading-snug outline-none placeholder:text-[#8A8272] focus:border-[#1E6B4F]/40"
+            className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-none border border-[#000000]/[0.12] bg-[#FFFFFF] px-3.5 py-2.5 text-[14px] leading-snug outline-none placeholder:text-[#808080] focus:border-[#1E6B4F]/40"
           />
           {streaming ? (
             <button
               onClick={stop}
               aria-label="Stop generating"
-              className="press flex h-[40px] w-[40px] items-center justify-center rounded-xl border border-[#B4442C]/40 bg-[#B4442C]/10"
+              className="press flex h-[40px] w-[40px] items-center justify-center rounded-none border border-[#B4442C]/40 bg-[#B4442C]/10"
             >
-              <span className="h-3 w-3 rounded-[3px] bg-[#B4442C]" />
+              <span className="h-3 w-3 rounded-none bg-[#B4442C]" />
             </button>
           ) : (
             <button
               onClick={() => void send()}
               disabled={!input.trim()}
               aria-label="Send message"
-              className="press flex h-[40px] w-[40px] items-center justify-center rounded-xl bg-[#1E6B4F] disabled:opacity-35"
+              className="press flex h-[40px] w-[40px] items-center justify-center rounded-none bg-[#1E6B4F] disabled:opacity-35"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="#F6F1E7" strokeWidth={2.2} className="h-4.5 w-4.5" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.2} className="h-4.5 w-4.5" aria-hidden="true">
                 <path d="M5 12h13M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
@@ -254,7 +254,7 @@ function Bubble({ msg }: { msg: Msg }) {
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[82%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-[#1E6B4F] px-3.5 py-2.5 text-[13.5px] font-medium leading-relaxed text-[#F6F1E7]">
+        <div className="max-w-[82%] whitespace-pre-wrap rounded-none  bg-[#1E6B4F] px-3.5 py-2.5 text-[13.5px] font-medium leading-relaxed text-[#FFFFFF]">
           {msg.text}
         </div>
       </div>
@@ -262,11 +262,11 @@ function Bubble({ msg }: { msg: Msg }) {
   }
   return (
     <div className="flex justify-start">
-      <div className="max-w-[88%] rounded-2xl rounded-bl-md border border-[#1F1B16]/[0.12] bg-[#FFFDF8] px-3.5 py-3">
+      <div className="max-w-[88%] rounded-none  border border-[#000000]/[0.12] bg-[#FFFFFF] px-3.5 py-3">
         <MarkdownLite text={msg.text} />
         <ToolActivity tools={msg.tools || []} active={!!msg.streaming} />
         {msg.streaming && !msg.text && !(msg.tools || []).length && (
-          <p className="flex items-center gap-1.5 text-[11.5px] italic text-[#6E675C]">
+          <p className="flex items-center gap-1.5 text-[11.5px] italic text-[#4B5563]">
             <span className="pulse-dot" aria-hidden="true" /> thinking
           </p>
         )}
@@ -290,8 +290,8 @@ function SourceRow({ sources, body }: { sources: SourceMap; body: string }) {
   const withMarkers = useMemo(() => body.split(/(\[(?:S?\d+)\])/g), [body]);
 
   return (
-    <div className="mt-2 border-t border-[#1F1B16]/[0.08] pt-2">
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6E675C]">Sources</p>
+    <div className="mt-2 border-t border-[#000000]/[0.08] pt-2">
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4B5563]">Sources</p>
       <div className="flex flex-wrap gap-1.5">
         {ids.map((id) => (
           <CitationChip key={id} id={id} title={sources[id]} />

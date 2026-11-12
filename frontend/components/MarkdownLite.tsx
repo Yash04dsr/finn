@@ -78,7 +78,7 @@ export default function MarkdownLite({ text }: { text: string }) {
       flushPara();
       flushList();
       blocks.push(
-        <p key={`h${key++}`} className="mb-1 mt-1 text-[13px] font-semibold text-[#1F1B16]">
+        <p key={`h${key++}`} className="mb-1 mt-1 text-[13px] font-semibold text-[#000000]">
           {inline(h[1], `h${key}`)}
         </p>
       );

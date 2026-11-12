@@ -26,8 +26,8 @@ export default function CompaniesPage() {
           <ErrorRow message={`Couldn't load the universe — ${error}. Is the backend running?`} onRetry={reload} />
         ) : rows.length === 0 ? (
           <div className="card mt-2 flex flex-col items-center px-6 py-10 text-center">
-            <p className="text-[15px] font-semibold text-[#1F1B16]">No companies yet</p>
-            <p className="mt-1.5 max-w-[260px] text-[12.5px] leading-relaxed text-[#6E675C]">
+            <p className="text-[15px] font-semibold text-[#000000]">No companies yet</p>
+            <p className="mt-1.5 max-w-[260px] text-[12.5px] leading-relaxed text-[#4B5563]">
               The universe loads once the backend has ingested the portfolio and ad-hoc tickers.
             </p>
           </div>
@@ -46,24 +46,24 @@ function Section({ label, count, rows }: { label: string; count: number; rows: T
   return (
     <section aria-label={label}>
       <div className="mb-2 flex items-baseline justify-between px-0.5">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6E675C]">{label}</h2>
-        <span className="num text-[11px] text-[#6E675C]">{count}</span>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4B5563]">{label}</h2>
+        <span className="num text-[11px] text-[#4B5563]">{count}</span>
       </div>
       <div className="card overflow-hidden">
         {rows.map((q, i) => (
           <Link
             key={q.ticker}
             href={`/company/${encodeURIComponent(q.ticker)}`}
-            className={`press flex items-center gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-[#1F1B16]/[0.08]" : ""}`}
+            className={`press flex items-center gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-[#000000]/[0.08]" : ""}`}
           >
-            <span className="num w-24 shrink-0 text-[13.5px] font-bold tracking-wide text-[#1F1B16]">{q.ticker}</span>
+            <span className="num w-24 shrink-0 text-[13.5px] font-bold tracking-wide text-[#000000]">{q.ticker}</span>
             <span
-              className="num rounded-md px-1.5 py-0.5 text-[11.5px] font-semibold"
+              className="num rounded-none px-1.5 py-0.5 text-[11.5px] font-semibold"
               style={changeStyle(q.change_pct)}
             >
               {pct(q.change_pct)}
             </span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="#B9AE99" strokeWidth={2} className="ml-auto h-4 w-4" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#808080" strokeWidth={2} className="ml-auto h-4 w-4" aria-hidden="true">
               <path d="m9 5 7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </Link>
@@ -77,6 +77,6 @@ function changeStyle(v: number | null): React.CSSProperties {
   const t = toneFor(v);
   return {
     background: t === "pos" ? "rgba(16,185,129,0.12)" : t === "neg" ? "rgba(244,63,94,0.12)" : "rgba(139,147,163,0.12)",
-    color: t === "pos" ? "#1E6B4F" : t === "neg" ? "#B4442C" : "#6E675C",
+    color: t === "pos" ? "#1E6B4F" : t === "neg" ? "#B4442C" : "#4B5563",
   };
 }

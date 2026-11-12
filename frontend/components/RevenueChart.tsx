@@ -13,7 +13,7 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
   const series = useMemo(() => quarterly.filter((q) => typeof q.revenue === "number").slice(-8), [quarterly]);
 
   if (series.length < 2) {
-    return <p className="text-[12px] text-[#6E675C]">Quarterly financials will appear here once filings are ingested.</p>;
+    return <p className="text-[12px] text-[#4B5563]">Quarterly financials will appear here once filings are ingested.</p>;
   }
 
   const W = 320;
@@ -63,33 +63,33 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
                   y={H - PAD_B - h - 7}
                   textAnchor="middle"
                   fontSize={9.5}
-                  fill="#1F1B16"
+                  fill="#000000"
                   style={{ fontVariantNumeric: "tabular-nums" }}
                 >
                   {crore(s.revenue).replace(" Cr", "")}
                 </text>
               )}
-              <text x={i * slot + slot / 2} y={H - 7} textAnchor="middle" fontSize={8.5} fill="#6E675C">
+              <text x={i * slot + slot / 2} y={H - 7} textAnchor="middle" fontSize={8.5} fill="#4B5563">
                 {s.period}
               </text>
             </g>
           );
         })}
         {margins.length > 1 && (
-          <polyline points={linePts} fill="none" stroke="#B07C24" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
+          <polyline points={linePts} fill="none" stroke="#B38B6D" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
         )}
         {margins.length > 0 && (
-          <circle cx={margins[margins.length - 1].i * slot + slot / 2} cy={yMar(margins[margins.length - 1].m)} r={3} fill="#B07C24" />
+          <circle cx={margins[margins.length - 1].i * slot + slot / 2} cy={yMar(margins[margins.length - 1].m)} r={3} fill="#B38B6D" />
         )}
       </svg>
       <div className="mt-2 flex items-center justify-between text-[11px]">
-        <span className="text-[#6E675C]">
-          <span className="font-semibold text-[#1F1B16]">{q.period}</span> · Rev {crore(q.revenue)} · EBITDA {crore(q.ebitda)}
+        <span className="text-[#4B5563]">
+          <span className="font-semibold text-[#000000]">{q.period}</span> · Rev {crore(q.revenue)} · EBITDA {crore(q.ebitda)}
         </span>
-        <span className="flex items-center gap-1 text-[#6E675C]">
-          <span className="h-[3px] w-4 rounded-full bg-[#1E6B4F]" />
+        <span className="flex items-center gap-1 text-[#4B5563]">
+          <span className="h-[3px] w-4 bg-[#1E6B4F]" />
           Revenue
-          <span className="ml-2 h-[3px] w-4 rounded-full bg-[#B07C24]" />
+          <span className="ml-2 h-[3px] w-4 bg-[#B38B6D]" />
           Margin
         </span>
       </div>

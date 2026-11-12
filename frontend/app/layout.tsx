@@ -1,11 +1,12 @@
 /*
-  FINN design intent (v2 — research-desk editorial):
-  1. Warm paper canvas (#f6f1e7) with ink text — reads like an equity research
-     note. Serif display headings (system Georgia), sans body, tabular figures.
-  2. One accent story: bottle green = capital at work / positive, oxblood = risk,
-     ochre = attention. Flat ink-on-paper, no gradients, no glow, no emojis.
-  3. Native-app feel on a phone: safe-area aware tab bar, slide-up sheets for
-     detail, tabular-nums everywhere a number appears.
+  FINN design intent (v3 — Swiss International Style):
+  1. Black on white. Helvetica. Square corners. 2px black top rules replace
+     card borders and shadows — information ranks by weight and position.
+  2. One accent: tan (#B38B6D) for hover rules and micro-details, never text.
+     Data semantics keep bottle-green/oxblood for pos/neg numbers only.
+  3. Grid discipline: uppercase letter-spaced micro-labels, tabular figures,
+     light-weight display headings. Native-app feel: safe-area tab bar,
+     square slide-up sheets.
 */
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
@@ -35,7 +36,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#f6f1e7",
+  themeColor: "#FFFFFF",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -32,7 +32,7 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
       <div className="flex items-center px-4 pt-3">
         <button
           onClick={() => router.push("/companies")}
-          className="press -ml-2 flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-medium text-[#6E675C]"
+          className="press -ml-2 flex items-center gap-1 rounded-none px-2 py-1 text-[13px] font-medium text-[#4B5563]"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden="true">
             <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
@@ -54,12 +54,12 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
           {/* Ticker header */}
           <div className="px-4 pt-2">
             <div className="flex items-center gap-2.5">
-              <span className="num rounded-md bg-[#1F1B16]/[0.06] px-2 py-1 text-[15px] font-bold tracking-wide">{c.ticker}</span>
+              <span className="num rounded-none bg-[#000000]/[0.06] px-2 py-1 text-[15px] font-bold tracking-wide">{c.ticker}</span>
               <div>
                 <span className="num block text-[20px] font-bold leading-none tabular-nums">{rupees(c.snapshot?.close)}</span>
                 <span
                   className="num text-[12px] font-semibold"
-                  style={{ color: toneFor(c.snapshot?.change_pct) === "pos" ? "#1E6B4F" : toneFor(c.snapshot?.change_pct) === "neg" ? "#B4442C" : "#6E675C" }}
+                  style={{ color: toneFor(c.snapshot?.change_pct) === "pos" ? "#1E6B4F" : toneFor(c.snapshot?.change_pct) === "neg" ? "#B4442C" : "#4B5563" }}
                 >
                   {pct(c.snapshot?.change_pct)} · {shortDate(c.snapshot?.date)}
                 </span>
@@ -82,11 +82,11 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
                 role="tab"
                 aria-selected={tab === t}
                 onClick={() => setTab(t)}
-                className="press rounded-full px-3.5 py-1.5 text-[12px] font-semibold capitalize transition-colors"
+                className="press px-3.5 py-1.5 text-[12px] font-semibold capitalize transition-colors"
                 style={
                   tab === t
                     ? { background: "rgba(16,185,129,0.14)", color: "#1E6B4F" }
-                    : { color: "#6E675C" }
+                    : { color: "#4B5563" }
                 }
               >
                 {t}
@@ -99,8 +99,8 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
               <>
                 <div className="card p-4">
                   <div className="mb-2 flex items-baseline justify-between">
-                    <h2 className="text-[12.5px] font-semibold text-[#1F1B16]">Quarterly revenue · EBITDA margin</h2>
-                    <span className="text-[10.5px] text-[#6E675C]">last 8 quarters</span>
+                    <h2 className="text-[12.5px] font-semibold text-[#000000]">Quarterly revenue · EBITDA margin</h2>
+                    <span className="text-[10.5px] text-[#4B5563]">last 8 quarters</span>
                   </div>
                   <RevenueChart quarterly={c.quarterly} />
                 </div>
@@ -120,11 +120,11 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
           </div>
 
           {/* Fixed research CTA */}
-          <div className="fixed inset-x-0 bottom-[64px] z-30 border-t border-[#1F1B16]/[0.12] bg-[#F6F1E7]/92 px-4 backdrop-blur-md" style={{ paddingBottom: "8px", paddingTop: "10px" }}>
+          <div className="fixed inset-x-0 bottom-[64px] z-30 border-t border-[#000000]/[0.12] bg-[#FFFFFF]/92 px-4 backdrop-blur-md" style={{ paddingBottom: "8px", paddingTop: "10px" }}>
             <div className="mx-auto w-full max-w-[480px]">
               <button
                 onClick={() => router.push(`/chat?ticker=${encodeURIComponent(ticker)}`)}
-                className="press flex w-full items-center justify-center gap-2 rounded-xl bg-[#1E6B4F] py-3 text-[14px] font-semibold text-[#F6F1E7]"
+                className="press flex w-full items-center justify-center gap-2 rounded-none bg-[#1E6B4F] py-3 text-[14px] font-semibold text-[#FFFFFF]"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
                   <path d="M12 2.5l1.9 5.1a2 2 0 0 0 1.2 1.2l5.1 1.9-5.1 1.9a2 2 0 0 0-1.2 1.2L12 18.9l-1.9-5.1a2 2 0 0 0-1.2-1.2L3.8 10.7l5.1-1.9a2 2 0 0 0 1.2-1.2L12 2.5Z" />
@@ -149,9 +149,9 @@ function PortfolioContext({ yoy, median }: { yoy: number; median: number }) {
       <svg viewBox="0 0 24 24" fill="none" stroke="#1E6B4F" strokeWidth={1.8} className="h-4 w-4 shrink-0" aria-hidden="true">
         <path d="M4 19h16M6 16V9m4 7V5m4 11v-4m4 4V8" strokeLinecap="round" />
       </svg>
-      <p className="num text-[12px] leading-snug text-[#6E675C]">
-        Latest revenue <b className="text-[#1F1B16]">{yoy > 0 ? "+" : ""}{yoy.toFixed(1)}% YoY</b> vs{" "}
-        <b className="text-[#1F1B16]">{median > 0 ? "+" : ""}{median.toFixed(1)}%</b> portfolio median —{" "}
+      <p className="num text-[12px] leading-snug text-[#4B5563]">
+        Latest revenue <b className="text-[#000000]">{yoy > 0 ? "+" : ""}{yoy.toFixed(1)}% YoY</b> vs{" "}
+        <b className="text-[#000000]">{median > 0 ? "+" : ""}{median.toFixed(1)}%</b> portfolio median —{" "}
         <b style={{ color: ahead ? "#1E6B4F" : "#B4442C" }}>
           {ahead ? `${delta.toFixed(1)} pts ahead` : `${Math.abs(delta).toFixed(1)} pts behind`}
         </b>{" "}
@@ -175,7 +175,7 @@ function DocBadge({ label, n }: { label: string; n?: number }) {
 
 function FilingsList({ filings }: { filings: CompanyResponse["filings"] }) {
   if (!filings.length) {
-    return <p className="card p-4 text-[12.5px] text-[#6E675C]">No filings ingested yet.</p>;
+    return <p className="card p-4 text-[12.5px] text-[#4B5563]">No filings ingested yet.</p>;
   }
   return (
     <div className="space-y-2.5">
@@ -183,14 +183,14 @@ function FilingsList({ filings }: { filings: CompanyResponse["filings"] }) {
         <div key={f.id} className="card p-3.5">
           <div className="flex items-center gap-2">
             <CategoryChip category={f.category} />
-            <span className="num ml-auto text-[11px] text-[#6E675C]">{shortDate(f.filed_at)}</span>
+            <span className="num ml-auto text-[11px] text-[#4B5563]">{shortDate(f.filed_at)}</span>
           </div>
-          <p className="mt-1.5 text-[13.5px] font-medium leading-snug text-[#1F1B16]">{f.headline}</p>
-          {f.summary && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[#6E675C]">{f.summary}</p>}
+          <p className="mt-1.5 text-[13.5px] font-medium leading-snug text-[#000000]">{f.headline}</p>
+          {f.summary && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[#4B5563]">{f.summary}</p>}
         </div>
       ))}
       {filings.length > 8 && (
-        <p className="text-center text-[11px] text-[#6E675C]">+ {filings.length - 8} older filings grounded in FINN</p>
+        <p className="text-center text-[11px] text-[#4B5563]">+ {filings.length - 8} older filings grounded in FINN</p>
       )}
     </div>
   );
