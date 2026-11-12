@@ -51,7 +51,7 @@ first-cuts driven by an earnings calendar, and a voice mode for the commute.
 both hit the same API. The repo README has a 2-minute quick start, `docs/demo-script.md`
 is a 3-minute walkthrough, and `docs/DECISIONS.md` is the full judgment trail.
 
-Links: [deployed app] · [GitHub repo] · [AI build history]
+Links: [deployed app — still needs a public host] · [GitHub repo](https://github.com/Yash04dsr/finn) · [AI build history]
 
 Name
 IIT Delhi – 2027
@@ -62,6 +62,7 @@ IIT Delhi – 2027
 
 - [ ] Deployed backend URL works from mobile data (not just LAN)
 - [ ] Expo app published / QR works on the grader's phone
-- [ ] GitHub repo pushed, README quick-start tested on a clean machine
+- [x] GitHub repo pushed: https://github.com/Yash04dsr/finn
+- [ ] README quick-start tested on a clean machine
 - [ ] AI build history exported (Cursor chats: Settings → export; include this one)
 - [ ] All links resolve in incognito
