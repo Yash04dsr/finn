@@ -46,7 +46,7 @@ export default function TabBar() {
               </span>
               <span
                 className="text-[9px] font-semibold tracking-[0.12em] transition-colors duration-150"
-                style={{ color: active ? "#000000" : "#808080" }}
+                style={{ color: active ? "#000000" : "#6B7280" }}
               >
                 {t.label}
               </span>

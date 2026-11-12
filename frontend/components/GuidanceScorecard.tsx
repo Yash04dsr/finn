@@ -16,9 +16,9 @@ const VERDICT_META: Record<
 > = {
   ahead: { label: "Ahead", color: "#FFFFFF", bg: "#000000" },
   on_track: { label: "On track", color: "#000000", bg: "#F5F1E8" },
-  behind: { label: "Behind", color: "#FECDD3", bg: "rgba(244,63,94,0.14)" },
-  pending: { label: "Pending", color: "#4B5563", bg: "rgba(255,255,255,0.06)" },
-  unverifiable: { label: "N/A", color: "#4B5563", bg: "rgba(255,255,255,0.06)" },
+  behind: { label: "Behind", color: "#FFFFFF", bg: "#B4442C" },
+  pending: { label: "Pending", color: "#4B5563", bg: "#F5F1E8" },
+  unverifiable: { label: "N/A", color: "#4B5563", bg: "#F5F1E8" },
 };
 
 const KIND_LABEL: Record<GuidanceClaim["kind"], string> = {
@@ -27,10 +27,10 @@ const KIND_LABEL: Record<GuidanceClaim["kind"], string> = {
   ebitda_exit_margin: "Exit EBITDA margin",
 };
 
-const CRED_META: Record<Scorecard["credibility"], { color: string; note: string }> = {
-  Strong: { color: "#000000", note: "delivered at or ahead of every graded commitment" },
-  Watch: { color: "#B38B6D", note: "mixed or limited delivery record so far" },
-  Challenged: { color: "#B4442C", note: "delivered behind committed numbers" },
+const CRED_META: Record<Scorecard["credibility"], { color: string; bg: string; note: string }> = {
+  Strong: { color: "#FFFFFF", bg: "#000000", note: "delivered at or ahead of every graded commitment" },
+  Watch: { color: "#000000", bg: "#EDE3D3", note: "mixed or limited delivery record so far" },
+  Challenged: { color: "#FFFFFF", bg: "#B4442C", note: "delivered behind committed numbers" },
 };
 
 export default function GuidanceScorecard({ data }: { data: Scorecard }) {
@@ -43,7 +43,10 @@ export default function GuidanceScorecard({ data }: { data: Scorecard }) {
         <h2 className="text-[13px] font-semibold text-[#000000]">Promises vs delivery</h2>
         <span
           className="chip"
-          style={{ backgroundColor: `${cred.color}1f`, color: cred.color }}
+          style={{
+            backgroundColor: cred.bg,
+            color: cred.color,
+          }}
           title={`Credibility: ${cred.note}`}
         >
           {data.credibility}
@@ -85,14 +88,14 @@ function ClaimRow({ claim }: { claim: GuidanceClaim }) {
           <b className="text-[#000000]">{band}{claim.claimed.unit}</b>
           {claim.delivered != null && (
             <>
-              {" "}→ delivered <b style={{ color: claim.verdict === "behind" ? "#B4442C" : "#1E6B4F" }}>{fmt(claim.delivered)}</b>
+              {" "}→ delivered <b style={{ color: claim.verdict === "behind" ? "#B4442C" : "#000000" }}>{fmt(claim.delivered)}</b>
               {" "}in <span className="text-[#000000]">{claim.delivered_period}</span>
             </>
           )}
         </p>
       </button>
       {open && (
-        <div className="border-t border-[#E5E7EB] bg-[#0D1420] px-3 py-2.5">
+        <div className="border-t border-[#E5E7EB] bg-[#F5F1E8] px-3 py-2.5">
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#4B5563]">
             In management's words · {claim.source.doc_title}
           </p>

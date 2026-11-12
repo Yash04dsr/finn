@@ -212,7 +212,7 @@ function ChatInner() {
             }}
             onKeyDown={onKeyDown}
             placeholder={ticker ? `Ask FINN about ${ticker}…` : "Ask FINN anything…"}
-            className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-none border border-[#000000]/[0.12] bg-[#FFFFFF] px-3.5 py-2.5 text-[14px] leading-snug outline-none placeholder:text-[#808080] focus:border-black"
+            className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-none border border-[#000000]/[0.12] bg-[#FFFFFF] px-3.5 py-2.5 text-[14px] leading-snug outline-none placeholder:text-[#6B7280] focus:border-black"
           />
           {streaming ? (
             <button

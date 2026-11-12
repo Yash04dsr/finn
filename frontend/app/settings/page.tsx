@@ -18,7 +18,7 @@ export default function SettingsPage() {
         <PushCard />
         <CostDashboard />
         <OpsCard />
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-[#808080]">
+        <p className="mt-6 text-center text-[11px] leading-relaxed text-[#4B5563]">
           FINN · investment intelligence · built on Google ADK
         </p>
       </div>
@@ -100,7 +100,7 @@ function AlertSettings() {
           onChange={(e) => setDraft({ ...draft, volume_multiplier: Number(e.target.value) })}
           className="mt-2.5"
         />
-        <span className="mt-1 flex justify-between text-[10px] text-[#808080]">
+        <span className="mt-1 flex justify-between text-[10px] text-[#4B5563]">
           <span>1.5×</span>
           <span>5×</span>
         </span>
@@ -121,7 +121,7 @@ function AlertSettings() {
           onChange={(e) => setDraft({ ...draft, price_move_pct: Number(e.target.value) })}
           className="mt-2.5"
         />
-        <span className="mt-1 flex justify-between text-[10px] text-[#808080]">
+        <span className="mt-1 flex justify-between text-[10px] text-[#4B5563]">
           <span>1%</span>
           <span>10%</span>
         </span>
