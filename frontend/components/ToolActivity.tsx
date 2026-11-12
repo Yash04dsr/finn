@@ -14,7 +14,7 @@ export default function ToolActivity({ tools, active }: { tools: string[]; activ
           onClick={() => setCollapsed(true)}
           className="mt-1.5 inline-flex items-center gap-1.5 border border-[#000000]/[0.12] bg-[#000000]/[0.04] px-2.5 py-1 text-[11px] text-[#4B5563] transition-colors"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="#1E6B4F" strokeWidth={2.2} className="h-3 w-3" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth={2.2} className="h-3 w-3" aria-hidden="true">
             <path d="m4.5 12.5 5 5L20 6.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           used {tools.length} tool{tools.length > 1 ? "s" : ""}

@@ -124,7 +124,7 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
             <div className="mx-auto w-full max-w-[480px]">
               <button
                 onClick={() => router.push(`/chat?ticker=${encodeURIComponent(ticker)}`)}
-                className="press flex w-full items-center justify-center gap-2 bg-black py-3 text-[14px] font-semibold uppercase tracking-[0.08em] text-white hover:bg-[#1F2937]"
+                className="press flex w-full items-center justify-center gap-2 rounded-none bg-black py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#1F2937]"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
                   <path d="M12 2.5l1.9 5.1a2 2 0 0 0 1.2 1.2l5.1 1.9-5.1 1.9a2 2 0 0 0-1.2 1.2L12 18.9l-1.9-5.1a2 2 0 0 0-1.2-1.2L3.8 10.7l5.1-1.9a2 2 0 0 0 1.2-1.2L12 2.5Z" />
@@ -164,7 +164,7 @@ function PortfolioContext({ yoy, median }: { yoy: number; median: number }) {
 function DocBadge({ label, n }: { label: string; n?: number }) {
   if (!n && n !== 0) return null;
   return (
-    <span className="chip" style={{ backgroundColor: "#FFFFFF", color: "#000000" }}>
+    <span className="chip" style={{ backgroundColor: "#F5F1E8", color: "#000000" }}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3 w-3" aria-hidden="true">
         <path d="M5 12.5l4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>

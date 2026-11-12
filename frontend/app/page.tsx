@@ -42,22 +42,28 @@ export default function FeedPage() {
     <main className="pb-[92px]">
       <Header />
 
-      {/* Window selector — Swiss segmented row, black underline marks selection */}
-      <div className="no-scrollbar flex gap-5 border-b border-[#E5E7EB] px-4 pt-3" role="tablist" aria-label="Feed window">
-        {WINDOWS.map((w) => (
-          <button
-            key={w.hours}
-            role="tab"
-            aria-selected={hours === w.hours}
-            onClick={() => setHours(w.hours)}
-            className={`num press relative pb-2 text-[12px] font-semibold tracking-[0.08em] transition-colors ${
-              hours === w.hours ? "text-black" : "text-[#808080]"
-            }`}
-          >
-            {w.label}
-            {hours === w.hours && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-black" />}
-          </button>
-        ))}
+      {/* Window selector — Swiss: underline rule for active, square buttons, 44px targets */}
+      <div className="no-scrollbar flex gap-1 overflow-x-auto px-4 pt-2" role="tablist" aria-label="Feed window">
+        {WINDOWS.map((w) => {
+          const active = hours === w.hours;
+          return (
+            <button
+              key={w.hours}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setHours(w.hours)}
+              className="num press relative min-h-[44px] px-4 text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors"
+              style={{ color: active ? "#000000" : "#4B5563" }}
+            >
+              {w.label}
+              <span
+                className="absolute inset-x-2 bottom-[6px] h-[2px] transition-colors"
+                style={{ background: active ? "#000000" : "transparent" }}
+                aria-hidden="true"
+              />
+            </button>
+          );
+        })}
       </div>
 
       {/* Hero digest */}
@@ -123,8 +129,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function EmptyState({ onRun }: { onRun: () => void }) {
   return (
     <div className="card mt-2 flex flex-col items-center px-6 py-10 text-center">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth={1.5} className="h-9 w-9" aria-hidden="true">
-        <path d="M3 12h4l2.5-7 4 14 2.5-7H21" strokeLinecap="square" strokeLinejoin="miter" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth={1.5} className="h-9 w-9 opacity-70" aria-hidden="true">
+        <path d="M3 12h4l2.5-7 4 14 2.5-7H21" strokeLinecap="square" />
       </svg>
       <p className="display mt-3 text-[17px] text-black">A quiet day in your portfolio</p>
       <p className="mt-1.5 max-w-[260px] text-[12.5px] leading-relaxed text-[#4B5563]">
@@ -132,7 +138,7 @@ function EmptyState({ onRun }: { onRun: () => void }) {
       </p>
       <button
         onClick={onRun}
-        className="press mt-4 bg-black px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#1F2937]"
+        className="press mt-4 bg-black px-5 py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#1F2937]"
       >
         Run demo pipeline
       </button>

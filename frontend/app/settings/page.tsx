@@ -76,7 +76,7 @@ function AlertSettings() {
           <button
             onClick={save}
             disabled={saving}
-            className="press bg-black px-3.5 py-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-white hover:bg-[#1F2937] disabled:opacity-50"
+            className="press min-h-[36px] bg-black px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.09em] text-white hover:bg-[#1F2937] disabled:opacity-40"
           >
             {saving ? "Saving…" : "Save changes"}
           </button>
@@ -142,11 +142,11 @@ function AlertSettings() {
                 })
               }
               aria-pressed={on}
-              className="press border px-2.5 py-1 text-[11px] font-medium capitalize transition-colors"
+              className="press min-h-[36px] border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.07em] transition-colors"
               style={
                 on
                   ? { borderColor: "#000000", background: "#000000", color: "#FFFFFF" }
-                  : { borderColor: "rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.03)", color: "#4B5563" }
+                  : { borderColor: "rgba(0,0,0,0.25)", background: "#FFFFFF", color: "#4B5563" }
               }
             >
               {cat.replace(/_/g, " ")}
@@ -226,7 +226,7 @@ function PushCard() {
       <button
         onClick={enable}
         disabled={state === "working" || state === "on"}
-        className="press mt-3 flex w-full items-center justify-center gap-2 rounded-none border border-black bg-white py-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-black hover:bg-black hover:text-white disabled:opacity-60"
+        className="press mt-3 flex w-full items-center justify-center gap-2 rounded-none border border-black bg-transparent py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-black hover:bg-black hover:text-white disabled:opacity-40"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4" aria-hidden="true">
           <path d="M12 3a6 6 0 0 0-6 6v3.5L4.5 16h15L18 12.5V9a6 6 0 0 0-6-6ZM10 19a2 2 0 0 0 4 0" strokeLinecap="round" strokeLinejoin="round" />

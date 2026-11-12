@@ -55,7 +55,7 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
                 width={barW}
                 height={h}
                 rx={4}
-                fill={isActive ? "#000000" : "#E5E7EB"}
+                fill={isActive ? "#000000" : "rgba(0,0,0,0.18)"}
               />
               {isLast && (
                 <text
@@ -87,7 +87,7 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
           <span className="font-semibold text-[#000000]">{q.period}</span> · Rev {crore(q.revenue)} · EBITDA {crore(q.ebitda)}
         </span>
         <span className="flex items-center gap-1 text-[#4B5563]">
-          <span className="h-[3px] w-4 bg-[#1E6B4F]" />
+          <span className="h-[3px] w-4 bg-black" />
           Revenue
           <span className="ml-2 h-[3px] w-4 bg-[#B38B6D]" />
           Margin

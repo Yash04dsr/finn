@@ -12,7 +12,7 @@ export default function CitationChip({ id, title }: { id: string; title: string 
         onClick={() => setOpen((o) => !o)}
         title={title}
         aria-label={`Source ${id}: ${title}`}
-        className="num ml-0.5 inline-flex h-[15px] min-w-[15px] translate-y-[-2px] items-center justify-center rounded-none border border-[#1E6B4F]/30 bg-[#1E6B4F]/10 px-[3px] align-super text-[9px] font-bold leading-none text-[#1E6B4F] transition-colors active:bg-[#1E6B4F]/25"
+        className="num ml-0.5 inline-flex h-[15px] min-w-[15px] translate-y-[-2px] items-center justify-center rounded-none border border-black/30 bg-black/[0.06] px-[3px] align-super text-[9px] font-bold leading-none text-black transition-colors active:bg-black/20"
       >
         {id}
       </button>
