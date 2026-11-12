@@ -76,7 +76,7 @@ function AlertSettings() {
           <button
             onClick={save}
             disabled={saving}
-            className="press bg-[#1E6B4F] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#FFFFFF] disabled:opacity-50"
+            className="press bg-black px-3.5 py-1.5 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-white hover:bg-[#1F2937] disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save changes"}
           </button>
@@ -86,7 +86,7 @@ function AlertSettings() {
       {/* Volume multiplier */}
       <label className="block">
         <span className="num text-[12.5px] text-[#000000]">
-          Volume &gt; <b className="text-[#1E6B4F]">{draft.volume_multiplier.toFixed(1)}×</b> 20-day avg
+          Volume &gt; <b className="text-black">{draft.volume_multiplier.toFixed(1)}×</b> 20-day avg
         </span>
         <input
           type="range"
@@ -106,7 +106,7 @@ function AlertSettings() {
       {/* Price move % */}
       <label className="mt-4 block">
         <span className="num text-[12.5px] text-[#000000]">
-          |move| &gt; <b className="text-[#1E6B4F]">{draft.price_move_pct.toFixed(1)}%</b> in a day
+          |move| &gt; <b className="text-black">{draft.price_move_pct.toFixed(1)}%</b> in a day
         </span>
         <input
           type="range"
@@ -145,7 +145,7 @@ function AlertSettings() {
               className="press border px-2.5 py-1 text-[11px] font-medium capitalize transition-colors"
               style={
                 on
-                  ? { borderColor: "rgba(16,185,129,0.45)", background: "rgba(16,185,129,0.13)", color: "#1E6B4F" }
+                  ? { borderColor: "#000000", background: "#000000", color: "#FFFFFF" }
                   : { borderColor: "rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.03)", color: "#4B5563" }
               }
             >
@@ -172,7 +172,7 @@ function TimeInput({ value, onChange }: { value: string; onChange: (v: string) =
       type="time"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="num rounded-none border border-[#000000]/[0.14] bg-[#FFFFFF] px-3 py-2 text-[13px] outline-none focus:border-[#1E6B4F]/40"
+      className="num rounded-none border border-[#000000]/[0.14] bg-[#FFFFFF] px-3 py-2 text-[13px] outline-none focus:border-black"
     />
   );
 }
@@ -226,7 +226,7 @@ function PushCard() {
       <button
         onClick={enable}
         disabled={state === "working" || state === "on"}
-        className="press mt-3 flex w-full items-center justify-center gap-2 rounded-none border border-[#1E6B4F]/40 bg-[#1E6B4F]/10 py-2.5 text-[13px] font-semibold text-[#1E6B4F] disabled:opacity-60"
+        className="press mt-3 flex w-full items-center justify-center gap-2 rounded-none border border-black bg-white py-2.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-black hover:bg-black hover:text-white disabled:opacity-60"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4" aria-hidden="true">
           <path d="M12 3a6 6 0 0 0-6 6v3.5L4.5 16h15L18 12.5V9a6 6 0 0 0-6-6ZM10 19a2 2 0 0 0 4 0" strokeLinecap="round" strokeLinejoin="round" />
@@ -309,12 +309,12 @@ function TierBar({ costs }: { costs: CostsResponse }) {
   return (
     <div>
       <div className="flex h-2.5 w-full overflow-hidden bg-[#000000]/[0.06]">
-        <div style={{ width: `${fastPct}%`, background: "#1E6B4F" }} />
+        <div style={{ width: `${fastPct}%`, background: "#000000" }} />
         <div style={{ width: `${100 - fastPct}%`, background: "#B38B6D" }} />
       </div>
       <div className="mt-1.5 flex justify-between text-[10.5px] text-[#4B5563]">
         <span className="flex items-center gap-1">
-          <span className="h-1.5 w-1.5 bg-[#1E6B4F]" /> fast {compactNum(fast)}
+          <span className="h-1.5 w-1.5 bg-black" /> fast {compactNum(fast)}
         </span>
         <span className="flex items-center gap-1">
           reasoning {compactNum(reasoning)} <span className="h-1.5 w-1.5 bg-[#B38B6D]" />
@@ -370,7 +370,7 @@ function OpsCard() {
           </>
         )}
       </button>
-      {state === "done" && <p className="mt-2 text-[11.5px] font-medium text-[#1E6B4F]">{result}</p>}
+      {state === "done" && <p className="mt-2 text-[11.5px] font-medium text-black">{result}</p>}
       {state === "error" && <p className="mt-2 text-[11.5px] font-medium text-[#B4442C]">{result}</p>}
     </section>
   );

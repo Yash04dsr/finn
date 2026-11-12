@@ -60,7 +60,7 @@ export default function DetailSheet({ alert, onClose }: { alert: Alert | null; o
                     : `Why is ${alert.ticker} moving like this, and is it noise or signal?`
                 )
               }
-              className="press mt-4 flex w-full items-center justify-center gap-2 rounded-none bg-[#1E6B4F] py-3 text-[14px] font-semibold text-[#FFFFFF]"
+              className="press mt-4 flex w-full items-center justify-center gap-2 bg-black py-3 text-[14px] font-semibold uppercase tracking-[0.08em] text-white hover:bg-[#1F2937]"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
                 <path d="M12 2.5l1.9 5.1a2 2 0 0 0 1.2 1.2l5.1 1.9-5.1 1.9a2 2 0 0 0-1.2 1.2L12 18.9l-1.9-5.1a2 2 0 0 0-1.2-1.2L3.8 10.7l5.1-1.9a2 2 0 0 0 1.2-1.2L12 2.5Z" />
@@ -100,8 +100,8 @@ function AnnouncementBody({
       <h2 className="mt-2 text-[16px] font-bold leading-snug text-[#000000]">{p.headline}</h2>
 
       {p.summary && (
-        <div className="mt-3 rounded-none border border-[#1E6B4F]/20 bg-[#1E6B4F]/[0.06] p-3">
-          <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#1E6B4F]">
+        <div className="mt-3 rounded-none border border-[#E5E7EB] bg-[#F5F1E8]">
+          <p className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-black">
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3" aria-hidden="true">
               <path d="M12 2.5l1.9 5.1a2 2 0 0 0 1.2 1.2l5.1 1.9-5.1 1.9a2 2 0 0 0-1.2 1.2L12 18.9l-1.9-5.1a2 2 0 0 0-1.2-1.2L3.8 10.7l5.1-1.9a2 2 0 0 0 1.2-1.2L12 2.5Z" />
             </svg>

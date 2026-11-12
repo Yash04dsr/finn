@@ -42,22 +42,20 @@ export default function FeedPage() {
     <main className="pb-[92px]">
       <Header />
 
-      {/* Window selector */}
-      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 pt-3" role="tablist" aria-label="Feed window">
+      {/* Window selector — Swiss segmented row, black underline marks selection */}
+      <div className="no-scrollbar flex gap-5 border-b border-[#E5E7EB] px-4 pt-3" role="tablist" aria-label="Feed window">
         {WINDOWS.map((w) => (
           <button
             key={w.hours}
             role="tab"
             aria-selected={hours === w.hours}
             onClick={() => setHours(w.hours)}
-            className="num press border px-3.5 py-1.5 text-[12px] font-semibold transition-colors"
-            style={
-              hours === w.hours
-                ? { background: "rgba(16,185,129,0.14)", borderColor: "rgba(16,185,129,0.4)", color: "#1E6B4F" }
-                : { borderColor: "rgba(255,255,255,0.07)", color: "#4B5563", background: "#FFFFFF" }
-            }
+            className={`num press relative pb-2 text-[12px] font-semibold tracking-[0.08em] transition-colors ${
+              hours === w.hours ? "text-black" : "text-[#808080]"
+            }`}
           >
             {w.label}
+            {hours === w.hours && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-black" />}
           </button>
         ))}
       </div>
@@ -125,16 +123,16 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function EmptyState({ onRun }: { onRun: () => void }) {
   return (
     <div className="card mt-2 flex flex-col items-center px-6 py-10 text-center">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#1E6B4F" strokeWidth={1.5} className="h-9 w-9 opacity-80" aria-hidden="true">
-        <path d="M3 12h4l2.5-7 4 14 2.5-7H21" strokeLinecap="round" strokeLinejoin="round" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth={1.5} className="h-9 w-9" aria-hidden="true">
+        <path d="M3 12h4l2.5-7 4 14 2.5-7H21" strokeLinecap="square" strokeLinejoin="miter" />
       </svg>
-      <p className="mt-3 text-[15px] font-semibold text-[#000000]">A quiet day in your portfolio</p>
+      <p className="display mt-3 text-[17px] text-black">A quiet day in your portfolio</p>
       <p className="mt-1.5 max-w-[260px] text-[12.5px] leading-relaxed text-[#4B5563]">
         No filings or anomalies crossed your thresholds in this window. Generate a demo day to see how FINN ranks a busy one.
       </p>
       <button
         onClick={onRun}
-        className="press mt-4 bg-[#1E6B4F] px-5 py-2.5 text-[13px] font-semibold text-[#FFFFFF]"
+        className="press mt-4 bg-black px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#1F2937]"
       >
         Run demo pipeline
       </button>

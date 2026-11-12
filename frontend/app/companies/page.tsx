@@ -76,7 +76,7 @@ function Section({ label, count, rows }: { label: string; count: number; rows: T
 function changeStyle(v: number | null): React.CSSProperties {
   const t = toneFor(v);
   return {
-    background: t === "pos" ? "rgba(16,185,129,0.12)" : t === "neg" ? "rgba(244,63,94,0.12)" : "rgba(139,147,163,0.12)",
+    background: t === "pos" ? "#F5F1E8" : t === "neg" ? "#000000" : "#FFFFFF",
     color: t === "pos" ? "#1E6B4F" : t === "neg" ? "#B4442C" : "#4B5563",
   };
 }

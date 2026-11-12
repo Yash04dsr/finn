@@ -55,7 +55,7 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
                 width={barW}
                 height={h}
                 rx={4}
-                fill={isActive ? "#1E6B4F" : "rgba(16,185,129,0.32)"}
+                fill={isActive ? "#000000" : "#E5E7EB"}
               />
               {isLast && (
                 <text

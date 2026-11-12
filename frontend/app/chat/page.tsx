@@ -79,24 +79,11 @@ function ChatInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autoscroll while streaming
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
   const send = useCallback(
-    async (raw?: string) => {
-      const text = (raw ?? input).trim();
+    async (override?: string) => {
+      const text = (override ?? input).trim();
       if (!text || streaming) return;
       setInput("");
-      try {
-        sessionStorage.removeItem("finn-chat-draft");
-      } catch {
-        /* ignore */
-      }
-
       const userMsg: Msg = { id: newId(), role: "user", text };
       const finnMsg: Msg = { id: newId(), role: "finn", text: "", streaming: true, tools: [] };
       setMessages((m) => [...m, userMsg, finnMsg]);
@@ -105,43 +92,46 @@ function ChatInner() {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
-      const patch = (fn: (m: Msg) => Msg) =>
-        setMessages((all) => all.map((m) => (m.id === finnMsg.id ? fn(m) : m)));
-
       try {
         for await (const ev of api.chatStream(
           { message: text, session_id: sessionRef.current, ticker, filing_id: filingId },
           ctrl.signal
         )) {
-          const e = ev as ChatEvent;
-          if (e.type === "tool" && e.tool_name) {
-            patch((m) => ({ ...m, tools: [...(m.tools || []), e.tool_name!] }));
-          } else if (e.type === "model" && e.content) {
-            patch((m) => ({ ...m, text: m.text + e.content }));
-          } else if (e.type === "final") {
-            const finalText = e.content || "";
-            patch((m) => {
-              const merged = finalText.length >= m.text.length ? finalText : m.text;
-              const { text: body, sources } = splitSources(merged);
-              return { ...m, text: body, sources, streaming: false };
-            });
-          } else if (e.type === "error") {
-            patch((m) => ({
-              ...m,
-              text: m.text || `Sorry — FINN hit an error${e.content ? `: ${e.content}` : ""}.`,
-              streaming: false,
-            }));
+          if (ev.type === "tool" && ev.tool_name) {
+            setMessages((m) =>
+              m.map((x) => (x.id === finnMsg.id ? { ...x, tools: [...(x.tools || []), ev.tool_name!] } : x))
+            );
+          } else if (ev.type === "model" && ev.content) {
+            setMessages((m) => m.map((x) => (x.id === finnMsg.id ? { ...x, text: x.text + ev.content } : x)));
+          } else if (ev.type === "final") {
+            const { text: body, sources } = splitSources(ev.content || "");
+            setMessages((m) =>
+              m.map((x) =>
+                x.id === finnMsg.id ? { ...x, text: body || x.text, sources, streaming: false } : x
+              )
+            );
+          } else if (ev.type === "error") {
+            setMessages((m) =>
+              m.map((x) =>
+                x.id === finnMsg.id
+                  ? { ...x, text: x.text || `Something went wrong: ${ev.content}`, streaming: false }
+                  : x
+              )
+            );
           }
         }
-      } catch (err) {
-        const aborted = err instanceof DOMException && err.name === "AbortError";
-        patch((m) => ({
-          ...m,
-          text: m.text || (aborted ? "Stopped." : "Connection to FINN failed. Try again."),
-          streaming: false,
-        }));
+      } catch (e) {
+        if (!(e instanceof DOMException && e.name === "AbortError")) {
+          setMessages((m) =>
+            m.map((x) =>
+              x.id === finnMsg.id
+                ? { ...x, text: x.text || `Connection lost — ${(e as Error).message}`, streaming: false }
+                : x
+            )
+          );
+        }
       } finally {
-        patch((m) => ({ ...m, streaming: false }));
+        setMessages((m) => m.map((x) => (x.id === finnMsg.id ? { ...x, streaming: false } : x)));
         setStreaming(false);
         abortRef.current = null;
       }
@@ -149,7 +139,15 @@ function ChatInner() {
     [input, streaming, ticker, filingId]
   );
 
-  const stop = () => abortRef.current?.abort();
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  // Stick to bottom while streaming.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -180,7 +178,7 @@ function ChatInner() {
               <button
                 key={s.label}
                 onClick={() => void send(s.prompt)}
-                className="press border border-[#000000]/[0.12] bg-[#FFFFFF] px-3 py-1.5 text-[12px] font-medium text-[#000000]"
+                className="press border border-black bg-white px-3 py-1.5 text-[12px] font-medium text-black transition-colors hover:bg-black hover:text-white"
               >
                 {s.label}
               </button>
@@ -198,7 +196,7 @@ function ChatInner() {
 
       {/* Composer */}
       <div
-        className="sticky bottom-0 border-t border-[#000000]/[0.12] bg-[#FFFFFF]/94 backdrop-blur-md"
+        className="sticky bottom-0 border-t border-black bg-white"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 8px)" }}
       >
         <div className="mx-auto flex w-full max-w-[480px] items-end gap-2 px-3 pt-2.5">
@@ -212,25 +210,25 @@ function ChatInner() {
             }}
             onKeyDown={onKeyDown}
             placeholder={ticker ? `Ask FINN about ${ticker}…` : "Ask FINN anything…"}
-            className="max-h-[120px] min-h-[40px] flex-1 resize-none rounded-none border border-[#000000]/[0.12] bg-[#FFFFFF] px-3.5 py-2.5 text-[14px] leading-snug outline-none placeholder:text-[#808080] focus:border-[#1E6B4F]/40"
+            className="max-h-[120px] min-h-[40px] flex-1 resize-none border border-[#E5E7EB] bg-white px-3.5 py-2.5 text-[14px] leading-snug outline-none placeholder:text-[#808080] focus:border-black"
           />
           {streaming ? (
             <button
               onClick={stop}
               aria-label="Stop generating"
-              className="press flex h-[40px] w-[40px] items-center justify-center rounded-none border border-[#B4442C]/40 bg-[#B4442C]/10"
+              className="press flex h-[40px] w-[40px] items-center justify-center border border-[#B4442C] bg-white"
             >
-              <span className="h-3 w-3 rounded-none bg-[#B4442C]" />
+              <span className="h-3 w-3 bg-[#B4442C]" />
             </button>
           ) : (
             <button
               onClick={() => void send()}
               disabled={!input.trim()}
               aria-label="Send message"
-              className="press flex h-[40px] w-[40px] items-center justify-center rounded-none bg-[#1E6B4F] disabled:opacity-35"
+              className="press flex h-[40px] w-[40px] items-center justify-center bg-black text-white disabled:bg-[#E5E7EB] disabled:text-[#808080]"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.2} className="h-4.5 w-4.5" aria-hidden="true">
-                <path d="M5 12h13M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} className="h-4.5 w-4.5" aria-hidden="true">
+                <path d="M5 12h13M13 6l6 6-6 6" strokeLinecap="square" />
               </svg>
             </button>
           )}
@@ -254,7 +252,7 @@ function Bubble({ msg }: { msg: Msg }) {
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[82%] whitespace-pre-wrap rounded-none  bg-[#1E6B4F] px-3.5 py-2.5 text-[13.5px] font-medium leading-relaxed text-[#FFFFFF]">
+        <div className="max-w-[82%] whitespace-pre-wrap border border-black bg-black px-3.5 py-2.5 text-[13.5px] font-medium leading-relaxed text-white">
           {msg.text}
         </div>
       </div>
@@ -262,7 +260,7 @@ function Bubble({ msg }: { msg: Msg }) {
   }
   return (
     <div className="flex justify-start">
-      <div className="max-w-[88%] rounded-none  border border-[#000000]/[0.12] bg-[#FFFFFF] px-3.5 py-3">
+      <div className="max-w-[88%] border-l-2 border-black bg-[#F5F1E8]/50 px-3.5 py-3">
         <MarkdownLite text={msg.text} />
         <ToolActivity tools={msg.tools || []} active={!!msg.streaming} />
         {msg.streaming && !msg.text && !(msg.tools || []).length && (
@@ -290,7 +288,7 @@ function SourceRow({ sources, body }: { sources: SourceMap; body: string }) {
   const withMarkers = useMemo(() => body.split(/(\[(?:S?\d+)\])/g), [body]);
 
   return (
-    <div className="mt-2 border-t border-[#000000]/[0.08] pt-2">
+    <div className="mt-2 border-t border-[#E5E7EB] pt-2">
       <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4B5563]">Sources</p>
       <div className="flex flex-wrap gap-1.5">
         {ids.map((id) => (
