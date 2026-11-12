@@ -32,7 +32,7 @@ export default function Sheet({
     <>
       <div className="sheet-backdrop" onClick={onClose} aria-hidden="true" />
       <div role="dialog" aria-modal="true" aria-label={title || "Details"} className="sheet-panel">
-        <div className="sticky top-0 z-10 flex justify-center bg-gradient-to-b from-[#131A26] via-[#131A26] to-transparent pt-2.5 pb-1">
+        <div className="sticky top-0 z-10 flex justify-center bg-gradient-to-b from-[#FFFDF8] via-[#FFFDF8] to-transparent pt-2.5 pb-1">
           <button aria-label="Close" onClick={onClose} className="h-1.5 w-11 rounded-full bg-white/20" />
         </div>
         {children}

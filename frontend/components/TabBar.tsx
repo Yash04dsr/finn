@@ -16,7 +16,7 @@ export default function TabBar() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.07] bg-[#0C111A]/92 backdrop-blur-md"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-[#1F1B16]/[0.12] bg-[#FBF7EE]/95 backdrop-blur-md"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 6px)" }}
     >
       <div className="mx-auto flex w-full max-w-[480px] items-stretch justify-around pt-1.5 pb-1">
@@ -33,7 +33,7 @@ export default function TabBar() {
                 <svg
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke={active ? "#10B981" : "#8B93A3"}
+                  stroke={active ? "#1E6B4F" : "#8A8272"}
                   strokeWidth={active ? 1.9 : 1.6}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -42,11 +42,11 @@ export default function TabBar() {
                 >
                   <path d={t.icon} />
                 </svg>
-                {active && <span className="absolute -top-[9px] left-1/2 h-[3px] w-6 -translate-x-1/2 rounded-full bg-[#10B981]" />}
+                {active && <span className="absolute -top-[9px] left-1/2 h-[3px] w-6 -translate-x-1/2 rounded-full bg-[#1E6B4F]" />}
               </span>
               <span
                 className="text-[10px] font-semibold tracking-wide transition-colors duration-150"
-                style={{ color: active ? "#10B981" : "#8B93A3" }}
+                style={{ color: active ? "#1E6B4F" : "#8A8272" }}
               >
                 {t.label}
               </span>

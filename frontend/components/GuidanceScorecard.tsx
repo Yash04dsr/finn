@@ -14,11 +14,11 @@ const VERDICT_META: Record<
   GuidanceClaim["verdict"],
   { label: string; color: string; bg: string }
 > = {
-  ahead: { label: "Ahead", color: "#04120C", bg: "#10B981" },
-  on_track: { label: "On track", color: "#34D399", bg: "rgba(16,185,129,0.12)" },
+  ahead: { label: "Ahead", color: "#F6F1E7", bg: "#1E6B4F" },
+  on_track: { label: "On track", color: "#1E6B4F", bg: "rgba(16,185,129,0.12)" },
   behind: { label: "Behind", color: "#FECDD3", bg: "rgba(244,63,94,0.14)" },
-  pending: { label: "Pending", color: "#8B93A3", bg: "rgba(255,255,255,0.06)" },
-  unverifiable: { label: "N/A", color: "#8B93A3", bg: "rgba(255,255,255,0.06)" },
+  pending: { label: "Pending", color: "#6E675C", bg: "rgba(255,255,255,0.06)" },
+  unverifiable: { label: "N/A", color: "#6E675C", bg: "rgba(255,255,255,0.06)" },
 };
 
 const KIND_LABEL: Record<GuidanceClaim["kind"], string> = {
@@ -28,9 +28,9 @@ const KIND_LABEL: Record<GuidanceClaim["kind"], string> = {
 };
 
 const CRED_META: Record<Scorecard["credibility"], { color: string; note: string }> = {
-  Strong: { color: "#10B981", note: "delivered at or ahead of every graded commitment" },
-  Watch: { color: "#F59E0B", note: "mixed or limited delivery record so far" },
-  Challenged: { color: "#F43F5E", note: "delivered behind committed numbers" },
+  Strong: { color: "#1E6B4F", note: "delivered at or ahead of every graded commitment" },
+  Watch: { color: "#B07C24", note: "mixed or limited delivery record so far" },
+  Challenged: { color: "#B4442C", note: "delivered behind committed numbers" },
 };
 
 export default function GuidanceScorecard({ data }: { data: Scorecard }) {
@@ -40,7 +40,7 @@ export default function GuidanceScorecard({ data }: { data: Scorecard }) {
   return (
     <section className="card p-4" aria-label="Guidance scorecard">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-[13px] font-semibold text-[#E8ECF3]">Promises vs delivery</h2>
+        <h2 className="text-[13px] font-semibold text-[#1F1B16]">Promises vs delivery</h2>
         <span
           className="chip"
           style={{ backgroundColor: `${cred.color}1f`, color: cred.color }}
@@ -49,9 +49,9 @@ export default function GuidanceScorecard({ data }: { data: Scorecard }) {
           {data.credibility}
         </span>
       </div>
-      <p className="mt-1 text-[11.5px] leading-relaxed text-[#8B93A3]">
+      <p className="mt-1 text-[11.5px] leading-relaxed text-[#6E675C]">
         Management's committed numbers, extracted from concalls and graded against delivered
-        results for <span className="num font-semibold text-[#C6CDD9]">{data.delivered_period}</span>.
+        results for <span className="num font-semibold text-[#3D382F]">{data.delivered_period}</span>.
       </p>
 
       <div className="mt-3 space-y-2">
@@ -73,36 +73,36 @@ function ClaimRow({ claim }: { claim: GuidanceClaim }) {
 
   return (
     <div className="overflow-hidden rounded-xl border border-white/[0.06]">
-      <button onClick={() => setOpen((o) => !o)} className="press w-full bg-white/[0.02] px-3 py-2.5 text-left">
+      <button onClick={() => setOpen((o) => !o)} className="press w-full bg-[#1F1B16]/[0.03] px-3 py-2.5 text-left">
         <div className="flex items-center gap-2">
-          <span className="text-[12px] font-semibold text-[#C6CDD9]">{KIND_LABEL[claim.kind]}</span>
+          <span className="text-[12px] font-semibold text-[#3D382F]">{KIND_LABEL[claim.kind]}</span>
           <span className="chip ml-auto" style={{ backgroundColor: v.bg, color: v.color }}>
             {v.label}
           </span>
         </div>
-        <p className="num mt-1 text-[11.5px] text-[#8B93A3]">
-          <span className="text-[#C6CDD9]">{claim.claim_period}</span> committed{" "}
-          <b className="text-[#E8ECF3]">{band}{claim.claimed.unit}</b>
+        <p className="num mt-1 text-[11.5px] text-[#6E675C]">
+          <span className="text-[#3D382F]">{claim.claim_period}</span> committed{" "}
+          <b className="text-[#1F1B16]">{band}{claim.claimed.unit}</b>
           {claim.delivered != null && (
             <>
-              {" "}→ delivered <b style={{ color: claim.verdict === "behind" ? "#FB7185" : "#34D399" }}>{fmt(claim.delivered)}</b>
-              {" "}in <span className="text-[#C6CDD9]">{claim.delivered_period}</span>
+              {" "}→ delivered <b style={{ color: claim.verdict === "behind" ? "#B4442C" : "#1E6B4F" }}>{fmt(claim.delivered)}</b>
+              {" "}in <span className="text-[#3D382F]">{claim.delivered_period}</span>
             </>
           )}
         </p>
       </button>
       {open && (
         <div className="border-t border-white/[0.06] bg-[#0D1420] px-3 py-2.5">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8B93A3]">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6E675C]">
             In management's words · {claim.source.doc_title}
           </p>
-          <p className="text-[12px] leading-relaxed text-[#C6CDD9]">“{claim.source.excerpt}”</p>
+          <p className="text-[12px] leading-relaxed text-[#3D382F]">“{claim.source.excerpt}”</p>
           {claim.source.url && (
             <a
               href={claim.source.url}
               target="_blank"
               rel="noreferrer"
-              className="mt-1.5 inline-block text-[11px] font-medium text-[#34D399] underline-offset-2 hover:underline"
+              className="mt-1.5 inline-block text-[11px] font-medium text-[#1E6B4F] underline-offset-2 hover:underline"
             >
               Open source filing ↗
             </a>

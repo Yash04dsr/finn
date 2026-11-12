@@ -1,16 +1,17 @@
-/* FINN — premium dark fintech. See layout.tsx header comment. */
+/* FINN — research-desk editorial: warm paper, ink type, serif display.
+   Design intent: looks like an equity research note, not an AI dashboard. */
 @import "tailwindcss";
 
 :root {
-  --bg: #0a0e14;
-  --surface: #111722;
-  --surface-hi: #161d2b;
-  --border: rgba(255, 255, 255, 0.07);
-  --text: #e8ecf3;
-  --muted: #8b93a3;
-  --accent: #10b981;
-  --red: #f43f5e;
-  --amber: #f59e0b;
+  --bg: #f6f1e7;
+  --surface: #fffdf8;
+  --surface-hi: #f3ede2;
+  --border: rgba(31, 27, 22, 0.12);
+  --text: #1f1b16;
+  --muted: #6e675c;
+  --accent: #1e6b4f;
+  --red: #b4442c;
+  --amber: #b07c24;
 }
 
 * {
@@ -23,6 +24,16 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(30, 107, 79, 0.18);
+}
+
+/* Editorial display face for headings — system serif, zero webfont cost. */
+.display {
+  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+  letter-spacing: -0.01em;
 }
 
 body {
@@ -52,7 +63,7 @@ select {
 }
 
 input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.7);
+  filter: invert(0.4) sepia(0.3);
 }
 
 /* ── Primitives ─────────────────────────────────────────────────────────── */
@@ -97,7 +108,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .skel {
   position: relative;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(31, 27, 22, 0.07);
   border-radius: 8px;
 }
 .skel::after {
@@ -105,7 +116,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  background: linear-gradient(90deg, transparent, rgba(31, 27, 22, 0.09), transparent);
   animation: shimmer 1.4s infinite;
 }
 @keyframes shimmer {
@@ -119,7 +130,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(4, 6, 10, 0.64);
+  background: rgba(40, 32, 20, 0.45);
   backdrop-filter: blur(2px);
   animation: fadeIn 0.16s ease;
 }
@@ -131,7 +142,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   z-index: 51;
   margin: 0 auto;
   max-width: 480px;
-  background: #131a26;
+  background: #fffdf8;
   border: 1px solid var(--border);
   border-bottom: none;
   border-radius: 1.25rem 1.25rem 0 0;
@@ -141,7 +152,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   -webkit-overflow-scrolling: touch;
   animation: slideUp 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 -12px 48px rgba(40, 32, 20, 0.25);
 }
 @keyframes slideUp {
   from {
@@ -226,7 +237,7 @@ input[type="range"] {
   width: 100%;
   height: 4px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(31, 27, 22, 0.16);
   outline: none;
 }
 input[type="range"]::-webkit-slider-thumb {
@@ -236,8 +247,8 @@ input[type="range"]::-webkit-slider-thumb {
   height: 22px;
   border-radius: 9999px;
   background: var(--accent);
-  border: 3px solid #0a0e14;
-  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.5);
+  border: 3px solid #f6f1e7;
+  box-shadow: 0 0 0 1px rgba(30, 107, 79, 0.5);
   cursor: pointer;
 }
 
@@ -248,20 +259,20 @@ input[type="range"]::-webkit-slider-thumb {
   transform: translateX(-50%);
   bottom: calc(84px + env(safe-area-inset-bottom));
   z-index: 60;
-  background: #16211c;
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  color: #d1fae5;
+  background: #e7f0e9;
+  border: 1px solid rgba(30, 107, 79, 0.4);
+  color: #1f5c43;
   font-size: 13px;
   padding: 10px 16px;
   border-radius: 9999px;
   white-space: nowrap;
   animation: fadeIn 0.18s ease;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 24px rgba(40, 32, 20, 0.2);
 }
 .toast-err {
-  background: #241318;
-  border-color: rgba(244, 63, 94, 0.4);
-  color: #fecdd3;
+  background: #f7e8e3;
+  border-color: rgba(180, 68, 44, 0.45);
+  color: #8c3b26;
 }
 
 /* Hide scrollbar on horizontal chip rows */

@@ -1,10 +1,9 @@
 /*
-  FINN design intent:
-  1. Mobile-first "terminal calm" — a single dark canvas (#0A0E14) where information
-     density is the luxury: every pixel carries a fact, hierarchy comes from
-     type weight and thin priority rails, never from decoration.
-  2. One accent story: emerald = capital at work / positive, rose = risk,
-     amber = attention. No gradients, no emojis — trust is earned with restraint.
+  FINN design intent (v2 — research-desk editorial):
+  1. Warm paper canvas (#f6f1e7) with ink text — reads like an equity research
+     note. Serif display headings (system Georgia), sans body, tabular figures.
+  2. One accent story: bottle green = capital at work / positive, oxblood = risk,
+     ochre = attention. Flat ink-on-paper, no gradients, no glow, no emojis.
   3. Native-app feel on a phone: safe-area aware tab bar, slide-up sheets for
      detail, tabular-nums everywhere a number appears.
 */
@@ -25,7 +24,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "FINN",
   },
 };
@@ -36,7 +35,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#0A0E14",
+  themeColor: "#f6f1e7",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

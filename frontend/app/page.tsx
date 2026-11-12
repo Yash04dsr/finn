@@ -53,8 +53,8 @@ export default function FeedPage() {
             className="num press rounded-full border px-3.5 py-1.5 text-[12px] font-semibold transition-colors"
             style={
               hours === w.hours
-                ? { background: "rgba(16,185,129,0.14)", borderColor: "rgba(16,185,129,0.4)", color: "#34D399" }
-                : { borderColor: "rgba(255,255,255,0.07)", color: "#8B93A3", background: "#111722" }
+                ? { background: "rgba(16,185,129,0.14)", borderColor: "rgba(16,185,129,0.4)", color: "#1E6B4F" }
+                : { borderColor: "rgba(255,255,255,0.07)", color: "#6E675C", background: "#FFFDF8" }
             }
           >
             {w.label}
@@ -118,23 +118,23 @@ export default function FeedPage() {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8B93A3]">{children}</h2>
+    <h2 className="mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6E675C]">{children}</h2>
   );
 }
 
 function EmptyState({ onRun }: { onRun: () => void }) {
   return (
     <div className="card mt-2 flex flex-col items-center px-6 py-10 text-center">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={1.5} className="h-9 w-9 opacity-80" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#1E6B4F" strokeWidth={1.5} className="h-9 w-9 opacity-80" aria-hidden="true">
         <path d="M3 12h4l2.5-7 4 14 2.5-7H21" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <p className="mt-3 text-[15px] font-semibold text-[#E8ECF3]">A quiet day in your portfolio</p>
-      <p className="mt-1.5 max-w-[260px] text-[12.5px] leading-relaxed text-[#8B93A3]">
+      <p className="mt-3 text-[15px] font-semibold text-[#1F1B16]">A quiet day in your portfolio</p>
+      <p className="mt-1.5 max-w-[260px] text-[12.5px] leading-relaxed text-[#6E675C]">
         No filings or anomalies crossed your thresholds in this window. Generate a demo day to see how FINN ranks a busy one.
       </p>
       <button
         onClick={onRun}
-        className="press mt-4 rounded-full bg-[#10B981] px-5 py-2.5 text-[13px] font-semibold text-[#04120C]"
+        className="press mt-4 rounded-full bg-[#1E6B4F] px-5 py-2.5 text-[13px] font-semibold text-[#F6F1E7]"
       >
         Run demo pipeline
       </button>

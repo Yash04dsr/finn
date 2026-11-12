@@ -88,19 +88,19 @@ export function humanMetric(m?: string | null): string {
 /** Category chip tint (inline styles — no CSS file churn). */
 export function categoryColor(cat?: string | null): { bg: string; fg: string } {
   const c = (cat || "unclassified").toLowerCase();
-  if (["results", "earnings_call"].includes(c)) return { bg: "rgba(16,185,129,0.14)", fg: "#34D399" };
-  if (["m&a", "fund_raise"].includes(c)) return { bg: "rgba(245,158,11,0.14)", fg: "#FBBF24" };
-  if (["litigation", "insider_trading", "pledging"].includes(c)) return { bg: "rgba(244,63,94,0.14)", fg: "#FB7185" };
-  if (["management_change"].includes(c)) return { bg: "rgba(139,92,246,0.16)", fg: "#C4B5FD" };
-  if (["credit_rating", "dividend", "bonus_split"].includes(c)) return { bg: "rgba(56,189,248,0.13)", fg: "#7DD3FC" };
-  if (["capex"].includes(c)) return { bg: "rgba(45,212,191,0.13)", fg: "#5EEAD4" };
-  return { bg: "rgba(139,147,163,0.14)", fg: "#A8B0BF" };
+  if (["results", "earnings_call"].includes(c)) return { bg: "rgba(30,107,79,0.12)", fg: "#1E6B4F" };
+  if (["m&a", "fund_raise"].includes(c)) return { bg: "rgba(176,124,36,0.13)", fg: "#8A611C" };
+  if (["litigation", "insider_trading", "pledging"].includes(c)) return { bg: "rgba(180,68,44,0.12)", fg: "#B4442C" };
+  if (["management_change"].includes(c)) return { bg: "rgba(122,74,42,0.13)", fg: "#7A4A2A" };
+  if (["credit_rating", "dividend", "bonus_split"].includes(c)) return { bg: "rgba(60,90,110,0.12)", fg: "#3C5A6E" };
+  if (["capex"].includes(c)) return { bg: "rgba(90,105,60,0.13)", fg: "#5A693C" };
+  return { bg: "rgba(138,130,114,0.14)", fg: "#6E675C" };
 }
 
 export function priorityColor(p: number): string {
-  if (p <= 1) return "#F43F5E";
-  if (p === 2) return "#F59E0B";
-  return "rgba(139,147,163,0.35)";
+  if (p <= 1) return "#B4442C";
+  if (p === 2) return "#B07C24";
+  return "rgba(138,130,114,0.4)";
 }
 
 /** × formatting: 3.2 → "3.2×" */

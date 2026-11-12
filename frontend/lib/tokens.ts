@@ -1,14 +1,14 @@
 // ─── Design tokens ───────────────────────────────────────────────────────────
-// Dark-only premium fintech palette. Applied globally in globals.css.
+// Research-desk editorial palette: warm paper, ink, bottle green, oxblood.
 
 export const T = {
-  bg: "#0A0E14",
-  surface: "#111722",
-  surfaceHi: "#161D2B",
-  border: "rgba(255,255,255,0.07)",
-  text: "#E8ECF3",
-  muted: "#8B93A3",
-  accent: "#10B981",
-  red: "#F43F5E",
-  amber: "#F59E0B",
+  bg: "#F6F1E7",
+  surface: "#FFFDF8",
+  surfaceHi: "#F3EDE2",
+  border: "rgba(31,27,22,0.12)",
+  text: "#1F1B16",
+  muted: "#6E675C",
+  accent: "#1E6B4F",
+  red: "#B4442C",
+  amber: "#B07C24",
 } as const;

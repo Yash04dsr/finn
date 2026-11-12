@@ -13,7 +13,7 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
   const series = useMemo(() => quarterly.filter((q) => typeof q.revenue === "number").slice(-8), [quarterly]);
 
   if (series.length < 2) {
-    return <p className="text-[12px] text-[#8B93A3]">Quarterly financials will appear here once filings are ingested.</p>;
+    return <p className="text-[12px] text-[#6E675C]">Quarterly financials will appear here once filings are ingested.</p>;
   }
 
   const W = 320;
@@ -55,7 +55,7 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
                 width={barW}
                 height={h}
                 rx={4}
-                fill={isActive ? "#10B981" : "rgba(16,185,129,0.32)"}
+                fill={isActive ? "#1E6B4F" : "rgba(16,185,129,0.32)"}
               />
               {isLast && (
                 <text
@@ -63,33 +63,33 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
                   y={H - PAD_B - h - 7}
                   textAnchor="middle"
                   fontSize={9.5}
-                  fill="#E8ECF3"
+                  fill="#1F1B16"
                   style={{ fontVariantNumeric: "tabular-nums" }}
                 >
                   {crore(s.revenue).replace(" Cr", "")}
                 </text>
               )}
-              <text x={i * slot + slot / 2} y={H - 7} textAnchor="middle" fontSize={8.5} fill="#8B93A3">
+              <text x={i * slot + slot / 2} y={H - 7} textAnchor="middle" fontSize={8.5} fill="#6E675C">
                 {s.period}
               </text>
             </g>
           );
         })}
         {margins.length > 1 && (
-          <polyline points={linePts} fill="none" stroke="#F59E0B" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
+          <polyline points={linePts} fill="none" stroke="#B07C24" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" opacity={0.95} />
         )}
         {margins.length > 0 && (
-          <circle cx={margins[margins.length - 1].i * slot + slot / 2} cy={yMar(margins[margins.length - 1].m)} r={3} fill="#F59E0B" />
+          <circle cx={margins[margins.length - 1].i * slot + slot / 2} cy={yMar(margins[margins.length - 1].m)} r={3} fill="#B07C24" />
         )}
       </svg>
       <div className="mt-2 flex items-center justify-between text-[11px]">
-        <span className="text-[#8B93A3]">
-          <span className="font-semibold text-[#E8ECF3]">{q.period}</span> · Rev {crore(q.revenue)} · EBITDA {crore(q.ebitda)}
+        <span className="text-[#6E675C]">
+          <span className="font-semibold text-[#1F1B16]">{q.period}</span> · Rev {crore(q.revenue)} · EBITDA {crore(q.ebitda)}
         </span>
-        <span className="flex items-center gap-1 text-[#8B93A3]">
-          <span className="h-[3px] w-4 rounded-full bg-[#10B981]" />
+        <span className="flex items-center gap-1 text-[#6E675C]">
+          <span className="h-[3px] w-4 rounded-full bg-[#1E6B4F]" />
           Revenue
-          <span className="ml-2 h-[3px] w-4 rounded-full bg-[#F59E0B]" />
+          <span className="ml-2 h-[3px] w-4 rounded-full bg-[#B07C24]" />
           Margin
         </span>
       </div>

@@ -42,11 +42,11 @@ export function ChatSkeleton() {
 export function ErrorRow({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="card flex flex-col items-center gap-2 p-6 text-center">
-      <p className="text-[13px] text-[#8B93A3]">{message}</p>
+      <p className="text-[13px] text-[#6E675C]">{message}</p>
       {onRetry && (
         <button
           onClick={onRetry}
-          className="press rounded-full border border-white/10 px-4 py-1.5 text-[12px] font-semibold text-[#E8ECF3]"
+          className="press rounded-full border border-white/10 px-4 py-1.5 text-[12px] font-semibold text-[#1F1B16]"
         >
           Retry
         </button>

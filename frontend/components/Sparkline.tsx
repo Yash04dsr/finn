@@ -28,7 +28,7 @@ export default function Sparkline({ data, width = 72, height = 26, className = "
   }, [data, width, height]);
 
   if (!path) return null;
-  const stroke = up ? "#10B981" : "#F43F5E";
+  const stroke = up ? "#1E6B4F" : "#B4442C";
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className={className} aria-hidden="true">
