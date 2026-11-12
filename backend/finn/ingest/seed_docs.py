@@ -1,4 +1,4 @@
-"""Seed hero-company primary documents: concall transcripts + results filings.
+"""Seed explicitly labelled synthetic demo documents.
 
 These are illustrative demo transcripts (shaped like real earnings calls) so the
 grounded Pull demos work instantly without downloading PDFs. Live PDF ingestion
@@ -6,7 +6,15 @@ remains available via docs.py for any ticker.
 """
 from __future__ import annotations
 
+import re
+
 from .. import db
+
+DEMO_DOC_TYPE = "illustrative_demo"
+DEMO_TITLE_PREFIX = "[ILLUSTRATIVE DEMO — NOT OFFICIAL]"
+DEMO_NOTICE = (
+    "[ILLUSTRATIVE DEMO — SYNTHETIC CONTENT, NOT AN OFFICIAL SOURCE] "
+)
 
 # Each entry: (doc_type, title, period, url, [paragraphs])
 PERSISTENT_TRANSCRIPTS = [
@@ -14,7 +22,7 @@ PERSISTENT_TRANSCRIPTS = [
         "doc_type": "transcript",
         "title": "Q1 FY26 Earnings Conference Call",
         "period": "Q1FY26",
-        "url": "https://www.persistent.com/investors/q1fy26-transcript",
+        "url": None,
         "paras": [
             "Moderator: Thank you and welcome to the Persistent Systems Q1 FY26 earnings call. Management was represented by Dr. Anand Deshpande, Chairman and MD, and Sunil Sapre, CFO.",
             "Sunil Sapre (CFO): Revenue for the quarter was USD 366 million, up 3.6 percent quarter-on-quarter in USD terms and 21 percent year-on-year in rupee terms at 3,080 crore. EBITDA margin stood at 18.4 percent, an improvement of 40 basis points sequentially.",
@@ -31,7 +39,7 @@ PERSISTENT_TRANSCRIPTS = [
         "doc_type": "transcript",
         "title": "Q4 FY25 Earnings Conference Call",
         "period": "Q4FY25",
-        "url": "https://www.persistent.com/investors/q4fy25-transcript",
+        "url": None,
         "paras": [
             "Sunil Sapre (CFO): For the full year FY25, revenue grew 23.5 percent in rupee terms to 10,778 crore. Q4 revenue was 2,941 crore, up 5.9 percent sequentially. EBITDA margin for the quarter was 18.1 percent.",
             "Sunil Sapre (CFO): For FY26, we guide to revenue growth of 18 to 22 percent in rupee terms and EBITDA margins of 18 to 19 percent. Capex will remain at about 2.5 percent of revenue as we expand our Nagpur and Hyderabad campuses.",
@@ -45,7 +53,7 @@ PERSISTENT_TRANSCRIPTS = [
         "doc_type": "transcript",
         "title": "Q2 FY26 Earnings Conference Call",
         "period": "Q2FY26",
-        "url": "https://www.persistent.com/investors/q2fy26-transcript",
+        "url": None,
         "paras": [
             "Moderator: Welcome to the Persistent Systems Q2 FY26 earnings call. Sunil Sapre announced his resignation before this call; Piyush Pandey, interim financial controller, is deputizing for finance.",
             "Piyush Pandey (Interim Financial Controller): Q2 FY26 revenue was 3,207 crore, up 4.1 percent quarter-on-quarter and 22.8 percent year-on-year. EBITDA margin expanded 80 basis points sequentially to 19.2 percent. PAT was 410 crore, up 7.3 percent sequentially.",
@@ -64,7 +72,7 @@ PERSISTENT_RESULTS = [
         "doc_type": "results_filing",
         "title": "Q2 FY26 Results Filing (Exchange Filing)",
         "period": "Q2FY26",
-        "url": "https://www.bseindia.com/persistent-q2fy26-results",
+        "url": None,
         "paras": [
             "Segment revenue: Enterprise Integration Services 1,244 crore; Application Development and Maintenance 987 crore; Digital Engineering and Cloud 976 crore.",
             "Geographic mix: North America 72 percent of revenue, Europe 17 percent, Rest of World 11 percent.",
@@ -79,7 +87,7 @@ CROMPTON_TRANSCRIPTS = [
         "doc_type": "transcript",
         "title": "Q2 FY26 Earnings Conference Call",
         "period": "Q2FY26",
-        "url": "https://www.crompton.com/investors/q2fy26-transcript",
+        "url": None,
         "paras": [
             "Management: Q2 FY26 revenue grew 9.4 percent year-on-year to 2,112 crore. The lighting business declined 2 percent while the electrical segment grew 16 percent on strong pumps and residential wiring demand.",
             "Management: On fans, our BLDC portfolio now contributes 24 percent of fan revenue, up from 15 percent last year. We target 35 percent by FY27. EBITDA margin was 12.2 percent against 11.8 percent last year same quarter.",
@@ -98,7 +106,7 @@ IRCTC_TRANSCRIPTS = [
         "doc_type": "transcript",
         "title": "Q2 FY26 Earnings Conference Call",
         "period": "Q2FY26",
-        "url": "https://www.irctc.com/investors/q2fy26-transcript",
+        "url": None,
         "paras": [
             "Management: Q2 FY26 revenue was 1,017 crore, up 7.2 percent year-on-year. Ticketing revenue grew 6.1 percent on 8.4 percent growth in reserved ticket bookings; rail neer and catering combined grew 9 percent.",
             "Management: The standardisation of catering tariffs is under review with the Railway Board. Any revision will be margin-accretive for the catering segment where current margin is 24 percent.",
@@ -112,7 +120,7 @@ IRCTC_TRANSCRIPTS = [
 
 
 def seed_all() -> dict:
-    """Load hero-company docs into the FTS corpus. Idempotent per doc title."""
+    """Load labelled demo fixtures without presenting them as primary sources."""
     from ..config import DOCS_DIR
 
     corpus = {
@@ -124,14 +132,32 @@ def seed_all() -> dict:
     for ticker, docs in corpus.items():
         n = 0
         for d in docs:
-            # skip if this doc already ingested
-            existing = db.search_chunks(ticker, d["title"], limit=1)
-            if existing and any(h["doc_title"] == d["title"] for h in existing):
+            stored = _demo_metadata(ticker, d)
+            # Remove rows created by older versions that falsely looked official.
+            with db.db() as conn:
+                conn.execute(
+                    "DELETE FROM chunks WHERE ticker=? AND doc_title=?",
+                    (ticker, d["title"]),
+                )
+                existing = conn.execute(
+                    "SELECT 1 FROM chunks WHERE ticker=? AND doc_title=? LIMIT 1",
+                    (ticker, stored["title"]),
+                ).fetchone()
+            if existing:
                 continue
             for seq, para in enumerate(d["paras"]):
-                db.add_chunk(ticker, d["doc_type"], d["title"], d["period"], d["url"], seq, para)
+                db.add_chunk(
+                    ticker,
+                    stored["doc_type"],
+                    stored["title"],
+                    d["period"],
+                    stored["url"],
+                    seq,
+                    DEMO_NOTICE + para,
+                )
                 n += 1
         stats[ticker] = n
+    db.ensure_fts()
     # also write a manifest for doc_overview
     import json
     manifest_path = DOCS_DIR / "manifest.json"
@@ -140,13 +166,31 @@ def seed_all() -> dict:
         manifest = json.loads(manifest_path.read_text())
     for ticker, docs in corpus.items():
         manifest[ticker] = [
-            {"doc_type": d["doc_type"], "title": d["title"], "period": d["period"],
-             "url": d["url"], "file": None}
+            {
+                "doc_type": DEMO_DOC_TYPE,
+                "original_doc_type": d["doc_type"],
+                "title": _demo_metadata(ticker, d)["title"],
+                "period": d["period"],
+                "url": _demo_metadata(ticker, d)["url"],
+                "file": None,
+                "is_demo": True,
+                "official_source": False,
+                "source_status": "illustrative_synthetic_not_official",
+            }
             for d in docs
         ]
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, indent=1))
     return stats
+
+
+def _demo_metadata(ticker: str, doc: dict) -> dict:
+    slug = re.sub(r"[^a-z0-9]+", "-", doc["title"].lower()).strip("-")
+    return {
+        "doc_type": DEMO_DOC_TYPE,
+        "title": f"{DEMO_TITLE_PREFIX} {doc['title']}",
+        "url": f"illustrative-demo://{ticker.lower()}/{slug}",
+    }
 
 
 if __name__ == "__main__":

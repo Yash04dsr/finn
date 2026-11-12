@@ -26,7 +26,7 @@ grounded coverage ends*, and prompts them to ingest more documents.
 ### 3. Hybrid classification instead of an LLM-everything pipeline
 Regex covers the taxonomy's clear cases at zero tokens; one batched call handles the
 ambiguous remainder. We gave up a little accuracy on odd phrasings to get
-deterministic latency, zero cost on bulk, and a system that degrades gracefully when
+deterministic latency, zero model-token usage on bulk, and a system that degrades gracefully when
 the LLM gateway is down.
 
 ### 4. SQLite (+FTS5) over a vector database
@@ -38,10 +38,9 @@ scale. A vector index becomes worth it at ~10x corpus size; the retrieval interf
 
 ### 5. Two-tier routing kept even though one model is reachable today
 The gateway key currently permits a single model, so fast and reasoning tiers resolve
-identically by default. We kept the tier separation in config and the cost ledger
-because the *architecture* is the point — analysis cost becomes a visible, swappable
-knob rather than an afterthought, and we demonstrated it live with a second model
-during the build.
+identically by default. We kept explicit tier separation in config and telemetry because
+the *architecture* is the point — a stronger permitted model can be introduced without
+rewiring the pipeline. The UI reports tokens by tier, not an unsupported monetary cost.
 
 ### 6. Expo app as the primary client, PWA as the fallback
 The graders should try FINN on a phone with zero friction: Expo Go scan → full native
@@ -56,12 +55,13 @@ PWA remains as a no-install web fallback sharing the same API.
 - **News/broker commentary** — the brief explicitly demotes secondary data on the pull
   side; primary-only is also what keeps the grounding contract enforceable.
 - **Vector embeddings / reranking** — premature at this corpus size (see trade-off 4).
-- **Auth/multi-user** — the challenge is a single investor's workflow; adding auth
-  would spend days on plumbing that demonstrates nothing about product judgment.
+- **Full account management** — the challenge is a single investor's workflow. The
+  public demo still isolates chat sessions, restricts CORS and rate-limits costly or
+  mutable endpoints.
 - **Live intraday prices** — the brief scopes price data to EOD; intraday adds noise,
   cost, and no new demonstrated capability.
-- **Android/iOS store builds** — Expo Go + a published preview covers "try it on a
-  phone" without developer-account overhead.
+- **App-store submission** — the PWA is the zero-install grading path; a push-capable
+  Expo preview build needs an authenticated EAS project and is documented separately.
 
 ## Where we'd take it next
 

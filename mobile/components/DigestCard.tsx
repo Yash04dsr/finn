@@ -15,6 +15,7 @@ export function DigestCard({ digest }: { digest: Digest | null }) {
   const items = r.items ?? [];
   const shown = r.stats?.shown ?? items.length;
   const hidden = r.stats?.hidden ?? 0;
+  const heldBack = r.stats?.held_back ?? 0;
   const visible = open ? items : items.slice(0, 4);
 
   return (
@@ -47,6 +48,7 @@ export function DigestCard({ digest }: { digest: Digest | null }) {
         <Text style={[type.title, { fontSize: 18, marginBottom: 3 }]}>{r.title}</Text>
         <Text style={type.small}>
           {shown} shown · {hidden} routine collapsed
+          {heldBack ? ` · ${heldBack} more outside this brief` : ''}
         </Text>
       </View>
 

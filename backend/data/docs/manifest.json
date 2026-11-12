@@ -1,50 +1,74 @@
 {
- "PERSISTENT": [
-  {
-   "doc_type": "transcript",
-   "title": "Q1 FY26 Earnings Conference Call",
-   "period": "Q1FY26",
-   "url": "https://www.persistent.com/investors/q1fy26-transcript",
-   "file": null
-  },
-  {
-   "doc_type": "transcript",
-   "title": "Q4 FY25 Earnings Conference Call",
-   "period": "Q4FY25",
-   "url": "https://www.persistent.com/investors/q4fy25-transcript",
-   "file": null
-  },
-  {
-   "doc_type": "transcript",
-   "title": "Q2 FY26 Earnings Conference Call",
-   "period": "Q2FY26",
-   "url": "https://www.persistent.com/investors/q2fy26-transcript",
-   "file": null
-  },
-  {
-   "doc_type": "results_filing",
-   "title": "Q2 FY26 Results Filing (Exchange Filing)",
-   "period": "Q2FY26",
-   "url": "https://www.bseindia.com/persistent-q2fy26-results",
-   "file": null
-  }
- ],
  "CROMPTON": [
   {
-   "doc_type": "transcript",
-   "title": "Q2 FY26 Earnings Conference Call",
+   "doc_type": "illustrative_demo",
+   "original_doc_type": "transcript",
+   "title": "[ILLUSTRATIVE DEMO \u2014 NOT OFFICIAL] Q2 FY26 Earnings Conference Call",
    "period": "Q2FY26",
-   "url": "https://www.crompton.com/investors/q2fy26-transcript",
-   "file": null
+   "url": "illustrative-demo://crompton/q2-fy26-earnings-conference-call",
+   "file": null,
+   "is_demo": true,
+   "official_source": false,
+   "source_status": "illustrative_synthetic_not_official"
+  }
+ ],
+ "PERSISTENT": [
+  {
+   "doc_type": "illustrative_demo",
+   "original_doc_type": "transcript",
+   "title": "[ILLUSTRATIVE DEMO \u2014 NOT OFFICIAL] Q1 FY26 Earnings Conference Call",
+   "period": "Q1FY26",
+   "url": "illustrative-demo://persistent/q1-fy26-earnings-conference-call",
+   "file": null,
+   "is_demo": true,
+   "official_source": false,
+   "source_status": "illustrative_synthetic_not_official"
+  },
+  {
+   "doc_type": "illustrative_demo",
+   "original_doc_type": "transcript",
+   "title": "[ILLUSTRATIVE DEMO \u2014 NOT OFFICIAL] Q4 FY25 Earnings Conference Call",
+   "period": "Q4FY25",
+   "url": "illustrative-demo://persistent/q4-fy25-earnings-conference-call",
+   "file": null,
+   "is_demo": true,
+   "official_source": false,
+   "source_status": "illustrative_synthetic_not_official"
+  },
+  {
+   "doc_type": "illustrative_demo",
+   "original_doc_type": "transcript",
+   "title": "[ILLUSTRATIVE DEMO \u2014 NOT OFFICIAL] Q2 FY26 Earnings Conference Call",
+   "period": "Q2FY26",
+   "url": "illustrative-demo://persistent/q2-fy26-earnings-conference-call",
+   "file": null,
+   "is_demo": true,
+   "official_source": false,
+   "source_status": "illustrative_synthetic_not_official"
+  },
+  {
+   "doc_type": "illustrative_demo",
+   "original_doc_type": "results_filing",
+   "title": "[ILLUSTRATIVE DEMO \u2014 NOT OFFICIAL] Q2 FY26 Results Filing (Exchange Filing)",
+   "period": "Q2FY26",
+   "url": "illustrative-demo://persistent/q2-fy26-results-filing-exchange-filing",
+   "file": null,
+   "is_demo": true,
+   "official_source": false,
+   "source_status": "illustrative_synthetic_not_official"
   }
  ],
  "IRCTC": [
   {
-   "doc_type": "transcript",
-   "title": "Q2 FY26 Earnings Conference Call",
+   "doc_type": "illustrative_demo",
+   "original_doc_type": "transcript",
+   "title": "[ILLUSTRATIVE DEMO \u2014 NOT OFFICIAL] Q2 FY26 Earnings Conference Call",
    "period": "Q2FY26",
-   "url": "https://www.irctc.com/investors/q2fy26-transcript",
-   "file": null
+   "url": "illustrative-demo://irctc/q2-fy26-earnings-conference-call",
+   "file": null,
+   "is_demo": true,
+   "official_source": false,
+   "source_status": "illustrative_synthetic_not_official"
   }
  ]
 }

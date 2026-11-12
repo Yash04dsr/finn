@@ -26,29 +26,27 @@ Open the **Feed** tab.
 
 Go to **Settings**.
 
-- Slide **volume multiplier** from 2.5× to 5× and back to 2×: "I decide what
-  'unusual' means. The engine watches every EOD bar against *my* thresholds."
-- Point at the **cost dashboard**: total tokens, fast vs reasoning split.
-  "Bulk work runs on the cheap tier — the ledger is in the product, not a slide."
+- Slide **volume multiplier** from 2.5× to 5×, then tap **Save changes**:
+  "I decide what 'unusual' means. The engine watches every EOD bar against *my*
+  thresholds."
+- Point at **Token usage**: provider-reported tokens, fast vs reasoning split.
+  "This is transparent usage telemetry—not a made-up rupee estimate."
 - (If push was enabled): "This exact alert would have buzzed my phone at 18:30."
 
 ## 1:50 — The grounded analyst (Pull)
 
 Go to **Chat** (or tap "Ask FINN about this filing" from any alert).
 
-Ask: **"What guidance did Persistent management give for FY26 and are they delivering
-against it?"**
+Ask: **"What did Persistent report about Q2 FY26 margin drivers and cash conversion?"**
 
 > "This is the narrative-vs-numbers question — the difference between summarising
 > management and analysing them."
 
-- Watch the tool chips: it **searches the transcripts**, pulls the **metrics tool**,
-  then answers — guidance 18–22% / 19% exit margin (quoted from the Q2 call), delivery
-  +22.8% YoY and 19.2% margin — **with [S#] citations** back to the transcript and the
-  results filing. Tap a citation chip to see the source.
-- Follow up: **"Bull vs bear on Crompton"** → a tight case each way, and it will flag
-  where the transcript and the numbers disagree (it caught a margin basis discrepancy
-  between the concall and the results filing during testing).
+- Watch the tool chips: it searches the issuer-hosted Q2 transcript and answers with
+  **[S#] citations**. Tap a citation chip to open the Persistent-hosted PDF and inspect
+  the cited passage.
+- Follow up: **"What changed between Crompton's Q1 commentary and Q2 results?"** FINN
+  compares Crompton's issuer-hosted call transcript and Q2 investor presentation.
 - Then: **"Suzlon Q2 numbers?"** → FINN **refuses**: not in the primary sources.
   Grounded means grounded — no vibes, no news, no model memory.
 
@@ -69,5 +67,6 @@ important, or a count of what wasn't."
 - **How is this different from a ChatGPT wrapper?** Deterministic alerting you can
   configure, deterministic math, a citation contract with tests, and cost visible in
   the product. The LLM is a component, not the product.
-- **What's the model cost per day?** Shown in Settings — bulk classification is one
-  batched call, one-liners are capped, analysis is where tokens deliberately go.
+- **What's the model cost per day?** FINN reports token usage by tier, not money. A
+  billed-cost claim needs the provider's pricing and cache accounting, so the UI does
+  not invent one.

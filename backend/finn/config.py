@@ -16,7 +16,8 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BACKEND_DIR / "data"
 SNAPSHOT_DIR = DATA_DIR / "snapshots"
 DOCS_DIR = DATA_DIR / "docs"
-DB_PATH = DATA_DIR / "finn.db"
+BUNDLED_DB_PATH = DATA_DIR / "finn.db"
+DB_PATH = Path(os.getenv("FINN_DB_PATH", str(BUNDLED_DB_PATH))).expanduser()
 
 # --- LLM routing (two tiers via Hyde gateway) --------------------------------
 HYDE_API_KEY = os.getenv("HYDE_API_KEY", "")
@@ -27,6 +28,20 @@ MODEL_FAST = os.getenv("FINN_MODEL_FAST", "hyde/glm-5.3-flash")
 # Same gateway model today (key restriction); swap in a stronger model via env
 # without touching code — the routing/cost-ledger separation stays meaningful.
 MODEL_REASONING = os.getenv("FINN_MODEL_REASONING", "hyde/glm-5.3-flash")
+
+# Public-demo boundaries. Native clients do not use browser CORS; web origins are
+# explicit and production deployments should set FINN_ALLOWED_ORIGINS.
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "FINN_ALLOWED_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
+]
+CHAT_RATE_PER_MINUTE = int(os.getenv("FINN_CHAT_RATE_PER_MINUTE", "20"))
+MUTATION_RATE_PER_MINUTE = int(os.getenv("FINN_MUTATION_RATE_PER_MINUTE", "10"))
+DEMO_RUN_RATE_PER_HOUR = int(os.getenv("FINN_DEMO_RUN_RATE_PER_HOUR", "2"))
 
 # --- Demo universe ------------------------------------------------------------
 PORTFOLIO = [

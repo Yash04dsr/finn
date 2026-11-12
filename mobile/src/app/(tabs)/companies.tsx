@@ -2,7 +2,7 @@
  * COMPANIES — Portfolio (17) and Ad-hoc research (4) quote lists.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, getBaseUrl, ApiError } from '../../../lib/api';
@@ -16,6 +16,8 @@ export default function CompaniesScreen() {
   const [data, setData] = useState<CompaniesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [ticker, setTicker] = useState('');
+  const [validation, setValidation] = useState('');
   const mounted = useRef(true);
 
   const load = useCallback(async () => {
@@ -56,6 +58,78 @@ export default function CompaniesScreen() {
           <Text style={type.micro}>
             {data ? `${data.portfolio.length} portfolio · ${data.adhoc.length} ad-hoc` : ''}
           </Text>
+        </View>
+
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderRadius: radius.lg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            padding: 14,
+            marginBottom: 18,
+          }}
+        >
+          <Text style={type.h3}>Research a company</Text>
+          <Text style={[type.small, { marginTop: 4, marginBottom: 10 }]}>
+            Enter an NSE or BSE ticker. FINN loads a quote when the symbol is listed, and refuses analysis when primary documents are missing.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              value={ticker}
+              onChangeText={(value) => {
+                setTicker(value.toUpperCase());
+                if (validation) setValidation('');
+              }}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={20}
+              placeholder="e.g. PERSISTENT"
+              placeholderTextColor={colors.faint}
+              accessibilityLabel="Ticker symbol"
+              style={{
+                flex: 1,
+                minHeight: 44,
+                borderWidth: 1,
+                borderColor: colors.borderStrong,
+                borderRadius: radius.sm,
+                paddingHorizontal: 12,
+                color: colors.text,
+                fontSize: 16,
+                fontWeight: '700',
+                letterSpacing: 0.4,
+              }}
+            />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                const normalized = ticker.trim().toUpperCase();
+                if (!normalized) {
+                  setValidation('Enter a ticker symbol.');
+                  return;
+                }
+                if (!/^[A-Z0-9&.-]{1,20}$/.test(normalized)) {
+                  setValidation('Use letters, numbers, ampersands, dots, or hyphens.');
+                  return;
+                }
+                setValidation('');
+                router.push({ pathname: '/company/[ticker]', params: { ticker: normalized } });
+              }}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.85 : 1,
+                minHeight: 44,
+                justifyContent: 'center',
+                paddingHorizontal: 14,
+                borderRadius: radius.sm,
+                backgroundColor: colors.accent,
+              })}
+            >
+              <Text style={{ color: '#04130C', fontWeight: '700', fontSize: 13 }}>Open</Text>
+            </Pressable>
+          </View>
+          {validation ? (
+            <Text style={{ color: colors.red, fontSize: 12, marginTop: 8 }}>{validation}</Text>
+          ) : null}
         </View>
 
         {error ? (

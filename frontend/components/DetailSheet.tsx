@@ -107,7 +107,7 @@ function AnnouncementBody({
             </svg>
             FINN's take
           </p>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-[#D7DEE9]">{p.summary}</p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-[#000000]">{p.summary}</p>
         </div>
       )}
 
@@ -135,7 +135,7 @@ function AnnouncementBody({
               /* popup blocked */
             }
           }}
-          className="press mt-3 w-full rounded-none border border-[#000000]/[0.12] py-2.5 text-[12.5px] font-medium text-[#4B5563]"
+          className="press mt-3 min-h-11 w-full rounded-none border border-[#000000]/[0.12] px-3 py-2.5 text-[12.5px] font-medium text-[#4B5563]"
         >
           {clickedUrl ? "Opening source filing…" : "View source filing"}
         </button>
@@ -171,11 +171,11 @@ function AnomalyBody({ p, kind }: { p: VolumeOrPricePayload; kind: "volume_spike
           </div>
         )}
       </div>
-      {Array.isArray(p.closes) && p.closes.length > 2 && (
+      {Array.isArray(p.spark) && p.spark.length > 2 && (
         <>
           <SectionLabel>Recent closes</SectionLabel>
           <div className="rounded-none border border-[#000000]/[0.12] bg-[#000000]/[0.03] p-3">
-            <Sparkline data={p.closes} width={320} height={64} className="w-full" />
+            <Sparkline data={p.spark} width={320} height={64} className="w-full" />
           </div>
         </>
       )}
@@ -188,7 +188,8 @@ function DigestBody({ p }: { p: DigestPayload }) {
     <>
       <h2 className="mt-2 text-[16px] font-bold leading-snug text-[#000000]">{p.title}</h2>
       <p className="num mt-1 text-[11.5px] text-[#4B5563]">
-        {p.window_hours}h window · {p.stats.shown} shown · {p.stats.hidden} collapsed
+        {p.window_hours}h window · {p.stats.shown} shown · {p.stats.hidden} routine collapsed
+        {p.stats.held_back ? ` · ${p.stats.held_back} more outside this brief` : ""}
       </p>
       <div className="mt-3 space-y-2.5">
         {p.items.map((it, i) => (
@@ -203,7 +204,11 @@ function WhyDisclosure({ why }: { why: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-4 overflow-hidden rounded-none border border-[#000000]/[0.12]">
-      <button onClick={() => setOpen((o) => !o)} className="press flex w-full items-center gap-2 bg-[#000000]/[0.03] px-3 py-2.5 text-left">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="press flex min-h-11 w-full items-center gap-2 bg-[#000000]/[0.03] px-3 py-2.5 text-left"
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="#4B5563" strokeWidth={1.8} className="h-3.5 w-3.5" aria-hidden="true">
           <circle cx="12" cy="12" r="9" />
           <path d="M9.6 9a2.5 2.5 0 0 1 4.9.8c0 1.6-2.5 2-2.5 3.4M12 16.6v.1" strokeLinecap="round" />

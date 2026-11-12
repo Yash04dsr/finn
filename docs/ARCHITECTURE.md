@@ -79,7 +79,8 @@ failures, and it makes the deterministic tests (`tests/test_metrics.py`,
 no probabilistic excuses.
 
 ### 2. Keywords first, LLM only for ambiguity
-~80% of filings classify with regex over the 17-category taxonomy at zero cost.
+The bundled demo classifies most filings with regex over the 17-category taxonomy at
+zero model-token usage.
 Ambiguous ones go to the fast tier **in one batched call** (one request for all
 pending items, not one per filing). This is the "smart model routing" instinct the
 brief asks for, applied at the pipeline level.
@@ -103,11 +104,11 @@ The digest composer ranks by (priority, recency), surfaces the top 12, and repor
 routine paperwork as a number ("6 routine collapsed") — surfacing *that it was
 filtered* is the trust mechanism; hiding silently is how apps lose investors.
 
-### 6. Cost as a product surface
-Every LLM call (classifier batch, one-liners, research turns) logs prompt/completion
-tokens to `cost_ledger` with its pipeline scope. The Settings cost dashboard renders
-the fast/reasoning split. When the reasoning tier is set to a stronger model, the
-ledger visibly shows the analysis premium — the trade-off is measurable, not rhetorical.
+### 6. Usage as a product surface
+Direct LiteLLM calls and ADK model events log provider-reported prompt/completion tokens
+to `cost_ledger` with an explicit routing tier. Settings renders the fast/reasoning
+split as usage telemetry. FINN does not claim monetary cost without a provider pricing
+table and cache/billing metadata.
 
 ## Model routing
 
@@ -129,9 +130,10 @@ was validated end-to-end earlier in the build with a real second model.
 - **Prices**: yfinance `.NS` with `.BO` fallback, 60 days, stored per EOD bar.
 - **Quarterly numbers**: Screener.in scrape first; bundled 7-quarter snapshot for 7
   demo companies.
-- **Documents**: Screener/manifest-driven PDF ingestion (pypdf, paragraph-aware
-  chunking with overlap, repeated-header stripping) + seeded transcripts for hero
-  companies. The corpus generalizes: `seed_docs.py` / `docs.py` ingest any ticker.
+- **Documents**: issuer-hosted Persistent and Crompton PDFs (official annual reports,
+  earnings transcripts and results presentations), ingested with pypdf using
+  paragraph-aware overlap and repeated-header stripping. `official_docs.py` records the
+  exact URLs; `docs.py` is the generic ingestion seam for another ticker.
 
 ## ADK specifics (v2.14)
 

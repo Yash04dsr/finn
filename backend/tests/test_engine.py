@@ -69,7 +69,8 @@ def test_priority_watchlist_promotion():
 
 def test_quiet_hours_logic():
     from datetime import datetime, timezone
-    ts_night = datetime(2026, 11, 11, 23, 30, tzinfo=timezone.utc)
-    ts_day = datetime(2026, 11, 11, 12, 0, tzinfo=timezone.utc)
-    assert engine.in_quiet_hours(ts_night) is True    # default 22:00-07:00
+    # Defaults are interpreted in the user's configured Asia/Kolkata timezone.
+    ts_night = datetime(2026, 11, 11, 18, 0, tzinfo=timezone.utc)  # 23:30 IST
+    ts_day = datetime(2026, 11, 11, 6, 30, tzinfo=timezone.utc)    # 12:00 IST
+    assert engine.in_quiet_hours(ts_night) is True
     assert engine.in_quiet_hours(ts_day) is False

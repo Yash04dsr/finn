@@ -25,7 +25,7 @@ export interface VolumeOrPricePayload {
   threshold?: number;
   close?: number;
   change_pct?: number;
-  closes?: number[]; // optional recent closes for sparkline
+  spark?: number[]; // recent closes from the alert engine
 }
 
 export interface DigestItem {
@@ -40,7 +40,7 @@ export interface DigestPayload {
   title: string;
   window_hours: number;
   items: DigestItem[];
-  stats: { total: number; shown: number; hidden: number };
+  stats: { total: number; shown: number; hidden: number; held_back?: number };
 }
 
 export interface Alert {
@@ -67,41 +67,45 @@ export interface DigestResponse {
 
 export interface FactRow {
   label: string;
-  value: string;
-  qoq?: number | null;
-  yoy?: number | null;
+  value: number | null;
+  qoq_pct?: number | null;
+  yoy_pct?: number | null;
 }
 
 export interface FactsTable {
+  period?: string;
+  source?: string;
+  is_illustrative?: boolean;
   rows: FactRow[];
 }
 
 export interface BioInfo {
   name: string;
-  most_recent_role?: string;
+  role?: string;
   background?: string;
 }
 
 export interface QuarterlyRow {
   period: string;
+  period_end: string;
   revenue: number | null;
   ebitda: number | null;
   pbt: number | null;
   pat: number | null;
+  source: string;
 }
 
 export interface FilingSummary {
-  id: string;
+  id: number;
   category: string;
   headline: string;
   filed_at: string;
-  summary?: string | null;
 }
 
 export interface ChunkStats {
-  transcripts?: number;
-  annual_reports?: number;
-  results?: number;
+  transcripts: number;
+  annual_reports: number;
+  results: number;
 }
 
 export interface GuidanceClaim {
@@ -126,7 +130,9 @@ export interface GuidanceScorecard {
 
 export interface CompanyResponse {
   ticker: string;
-  snapshot?: { close: number; change_pct: number; date: string } | null;
+  tracked?: boolean;
+  available?: boolean;
+  snapshot?: { ticker: string; close: number; change_pct: number; date: string } | null;
   quarterly: QuarterlyRow[];
   filings: FilingSummary[];
   chunk_stats: ChunkStats;
@@ -183,8 +189,17 @@ export interface ChatEvent {
   done?: boolean;
 }
 
-// Parsed SOURCES block: S1 → title
-export type SourceMap = Record<string, string>;
+export interface SourceInfo {
+  id: string;
+  title: string;
+  doc_type?: string;
+  period?: string;
+  url?: string;
+  excerpt?: string;
+}
+
+// Parsed SOURCES block: numeric source id → source metadata
+export type SourceMap = Record<string, SourceInfo>;
 
 export const CATEGORIES = [
   "results",

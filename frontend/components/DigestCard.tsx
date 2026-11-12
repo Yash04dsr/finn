@@ -36,6 +36,7 @@ export default function DigestCard({ digest, windowEnd }: { digest: DigestPayloa
 
       <p className="num mt-1 text-[11.5px] uppercase tracking-[0.08em] text-[#4B5563]">
         {digest.stats.shown} shown · {digest.stats.hidden} routine collapsed
+        {digest.stats.held_back ? ` · ${digest.stats.held_back} more outside this brief` : ""}
         {windowEnd ? ` · till ${new Date(windowEnd).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : ""}
       </p>
 

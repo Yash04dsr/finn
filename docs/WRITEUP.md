@@ -9,9 +9,10 @@ Dear ENAM team,
 
 **What I built.** FINN — a mobile-first investment agent that runs the daily loop a
 lean public-markets investor actually lives: a **Push** side that tells you what changed
-across your portfolio and why you should care, and a **Pull** side that researches any
-NSE-listed company on demand, grounded strictly in primary sources (annual reports,
-concall transcripts, results filings) with citations on every claim.
+across your portfolio and why you should care, and a **Pull** side that researches only
+when verified issuer-hosted evidence is available. Its Persistent and Crompton corpus
+contains official annual reports, call transcripts, and results presentations; unknown
+coverage produces an explicit refusal rather than an invented answer.
 
 The brief's line that stuck with me was *"the scarce skill is not aggregating
 information. It's filtering it."* So FINN's core behaviours are filtering behaviours:
@@ -26,8 +27,9 @@ its sources** — the refusal is tested, not aspirational.
 1. *The LLM never does math.* All numbers are computed in tested Python; the model
    narrates them. This trades a little flexibility for the elimination of
    confident-wrong-number failures.
-2. *Keywords first, LLM for ambiguity, one batched call.* Bulk classification costs
-   zero tokens; the cost ledger (visible in the app) shows the routing discipline.
+2. *Keywords first, LLM for ambiguity, one batched call.* Deterministic matches cost
+   zero tokens; the token-usage ledger shows provider-reported routing telemetry without
+   pretending token counts are billed currency.
 3. *SQLite + BM25 over a vector DB.* At this corpus size, FTS5 with snippets gives
    precise, citable retrieval with no infrastructure; the retrieval interface is the
    seam where embeddings would go.
@@ -37,7 +39,8 @@ its sources** — the refusal is tested, not aspirational.
 
 **What I deliberately left out.** News/broker commentary (primary-only keeps the
 grounding contract enforceable), vector embeddings (premature at this corpus size),
-multi-user auth (the challenge is one investor's workflow), and real LinkedIn scraping
+full account management (the public demo instead isolates chat sessions and rate-limits
+costly endpoints), and real LinkedIn scraping
 (ToS-brittle; the enrichment seam is structured and a licensed provider would slot in).
 
 **Where I'd take it next.** Digest memory (diff consecutive briefs: "2 new since

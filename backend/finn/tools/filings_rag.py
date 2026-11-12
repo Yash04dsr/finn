@@ -17,7 +17,16 @@ def search_docs(ticker: str, query: str, doc_type: str | None = None,
 
     Returns a JSON string for the ADK function-calling contract.
     """
-    hits = db.search_chunks(ticker, query, doc_type=doc_type, limit=limit)
+    hits = db.search_chunks(
+        ticker,
+        query,
+        doc_type=doc_type,
+        limit=limit if doc_type else limit * 3,
+    )
+    hits = [
+        hit for hit in hits
+        if hit.get("doc_type") != "illustrative_demo"
+    ][:limit]
     if not hits:
         return json.dumps({
             "status": "no_results",
@@ -53,10 +62,21 @@ def doc_overview(ticker: str) -> str:
         "annual_reports": db.chunk_count(ticker, "annual_report"),
         "results_filings": db.chunk_count(ticker, "results_filing"),
     }
-    return _json.dumps({"ticker": ticker, "chunk_counts": counts,
-                        "documents": [{"doc_type": d["doc_type"], "title": d.get("title", ""),
-                                       "period": d.get("period", ""), "url": d.get("url", "")}
-                                      for d in manifest]})
+    documents = [
+        {
+            "doc_type": d["doc_type"],
+            "title": d.get("title", ""),
+            "period": d.get("period", ""),
+            "url": d.get("url", ""),
+        }
+        for d in manifest
+        if d.get("doc_type") != "illustrative_demo" and d.get("official_source", True)
+    ]
+    return _json.dumps({
+        "ticker": ticker,
+        "chunk_counts": counts,
+        "documents": documents,
+    })
 
 
 # --- ADK function-tool wrappers (dict-in/dict-out contract) -------------------------

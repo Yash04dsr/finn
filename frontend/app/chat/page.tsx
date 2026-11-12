@@ -276,7 +276,7 @@ function Bubble({ msg }: { msg: Msg }) {
   );
 }
 
-/** Renders [S1]/[S2] markers in the body as tappable chips + the source list. */
+/** Shows cited sources first, while retaining any additional parsed source entries. */
 function SourceRow({ sources, body }: { sources: SourceMap; body: string }) {
   const ids = useMemo(() => {
     const found = new Set<string>();
@@ -284,21 +284,18 @@ function SourceRow({ sources, body }: { sources: SourceMap; body: string }) {
       const id = m[1].replace(/^S/, "");
       if (sources[id]) found.add(id);
     }
+    for (const id of Object.keys(sources)) found.add(id);
     return Array.from(found).sort((a, b) => Number(a) - Number(b));
   }, [body, sources]);
-
-  const withMarkers = useMemo(() => body.split(/(\[(?:S?\d+)\])/g), [body]);
 
   return (
     <div className="mt-2 border-t border-[#000000]/[0.08] pt-2">
       <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4B5563]">Sources</p>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="space-y-1.5">
         {ids.map((id) => (
-          <CitationChip key={id} id={id} title={sources[id]} />
+          <CitationChip key={id} source={sources[id]} />
         ))}
       </div>
-      {/* body kept for marker matching; actual marker glyphs stay inline in text */}
-      <span className="hidden">{withMarkers.length}</span>
     </div>
   );
 }

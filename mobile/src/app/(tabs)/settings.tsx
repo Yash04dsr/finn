@@ -7,9 +7,13 @@ import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
 
 import { api, getBaseUrl, setBaseUrl, ApiError } from '../../../lib/api';
+import {
+  PUSH_ENVIRONMENT_HINT,
+  PushRegistrationError,
+  registerForPushNotifications,
+} from '../../../lib/notifications';
 import { colors, radius, type } from '../../../lib/theme';
 import type { Costs, Settings as SettingsT } from '../../../lib/types';
 import { DEFAULT_BASE_URL, loadBaseUrl, saveBaseUrl } from '../../../lib/store';
@@ -126,36 +130,18 @@ export default function SettingsScreen() {
     setPushState('working');
     setPushMsg('');
     try {
-      const existing = await Notifications.getPermissionsAsync();
-      let granted = existing.granted;
-      if (!granted && existing.canAskAgain) {
-        const req = await Notifications.requestPermissionsAsync();
-        granted = req.granted;
-      }
-      if (!granted) {
-        setPushState('failed');
-        setPushMsg('Notification permission not granted on this device.');
-        return;
-      }
-      const token = await Notifications.getDevicePushTokenAsync();
-      const expoToken =
-        'data' in token && typeof (token as { data?: string }).data === 'string'
-          ? (token as { data: string }).data
-          : ((token as unknown as { token?: string }).token ?? '');
-      if (!expoToken) {
-        setPushState('failed');
-        setPushMsg('Could not obtain a push token on this device (emulator?).');
-        return;
-      }
+      const expoToken = await registerForPushNotifications();
       await api.pushSubscribe(expoToken);
       setPushState('done');
       setPushMsg('Registered with FINN push service.');
     } catch (e) {
       setPushState('failed');
       setPushMsg(
-        e instanceof Error
-          ? `Push unavailable here: ${e.message}`
-          : 'Push unavailable on this device.',
+        e instanceof PushRegistrationError
+          ? e.userMessage
+          : e instanceof ApiError
+            ? `Token created, but the backend rejected registration: ${e.message}`
+            : 'Push registration failed. Check the network connection and tap to retry.',
       );
     }
   };
@@ -375,11 +361,10 @@ export default function SettingsScreen() {
               <Text style={[type.micro, { color: pushState === 'failed' ? colors.amber : colors.accent, lineHeight: 16 }]}>
                 {pushMsg}
               </Text>
-            ) : (
-              <Text style={[type.micro, { color: colors.faint, lineHeight: 16 }]}>
-                Registers this device's Expo push token with the backend.
-              </Text>
-            )}
+            ) : null}
+            <Text style={[type.micro, { color: colors.faint, lineHeight: 16 }]}>
+              Registers this install&apos;s Expo push token with the backend. {PUSH_ENVIRONMENT_HINT}
+            </Text>
           </View>
         </View>
 
@@ -401,9 +386,12 @@ export default function SettingsScreen() {
 
         {/* ---- Costs ---- */}
         <View>
-          <SectionHeader title="Token costs" hint={costs ? `${fmtTokens(costs.total_tokens)} total` : undefined} />
+          <SectionHeader title="Token usage" hint={costs ? `${fmtTokens(costs.total_tokens)} total` : undefined} />
           {costs ? (
             <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 12 }}>
+              <Text style={[type.micro, { color: colors.faint, lineHeight: 16 }]}>
+                Provider-reported tokens by routing tier. This is usage telemetry, not billed cost.
+              </Text>
               {/* two-segment tier bar */}
               <View>
                 <View style={{ height: 10, borderRadius: 5, overflow: 'hidden', flexDirection: 'row', backgroundColor: colors.surface2 }}>

@@ -3,7 +3,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, getBaseUrl, ApiError } from '../../../lib/api';
 import { colors, radius, type } from '../../../lib/theme';
@@ -30,6 +30,7 @@ const WINDOWS: { label: string; hours: number }[] = [
 ];
 
 export default function FeedScreen() {
+  const params = useLocalSearchParams<{ alert?: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [hours, setHours] = useState(24);
@@ -80,6 +81,11 @@ export default function FeedScreen() {
 
   const attention = useMemo(() => (alerts ?? []).filter((a) => a.priority <= 2), [alerts]);
   const rest = useMemo(() => (alerts ?? []).filter((a) => a.priority >= 3), [alerts]);
+  const routedAlert = useMemo(
+    () => (params.alert ? alerts?.find((item) => String(item.id) === params.alert) : null),
+    [alerts, params.alert],
+  );
+  const displayedAlert = selected ?? routedAlert;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -211,8 +217,15 @@ export default function FeedScreen() {
         </View>
       ) : null}
 
-      {selected ? (
-        <AlertDetailModal alert={selected} width={width} onClose={() => setSelected(null)} />
+      {displayedAlert ? (
+        <AlertDetailModal
+          alert={displayedAlert}
+          width={width}
+          onClose={() => {
+            setSelected(null);
+            if (routedAlert) router.setParams({ alert: '' });
+          }}
+        />
       ) : null}
     </View>
   );

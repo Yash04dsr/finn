@@ -47,12 +47,18 @@ def compose_digest(enriched: list[dict], threshold_alerts: list[dict],
         items.extend(tier_rows)
 
     routine_count = sum(1 for a in enriched if a.get("priority", 4) == 4)
+    shown = items[:12]
     total = len(items) + routine_count
     return {
         "title": f"Your {hours}h brief",
         "window_hours": hours,
-        "items": items[:12],
-        "stats": {"total": total, "shown": min(len(items), 12), "hidden": routine_count},
+        "items": shown,
+        "stats": {
+            "total": total,
+            "shown": len(shown),
+            "hidden": routine_count,
+            "held_back": len(items) - len(shown),
+        },
     }
 
 

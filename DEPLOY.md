@@ -4,11 +4,17 @@
 
 1. Push this repo to GitHub.
 2. Render → New → Blueprint → point at the repo (uses `backend/render.yaml`).
-3. Set `HYDE_API_KEY` in the dashboard (Secret File or env var).
-4. After first boot, hit `POST /api/demo/run` once (curl or the app's Settings button)
-   to build the SQLite demo DB from the bundled snapshots.
-   - The DB is ephemeral on the free tier; the seeder makes that a non-issue.
-5. Verify: `curl https://<backend-url>/api/settings` → thresholds JSON.
+3. Set `HYDE_API_KEY` and `FINN_ALLOWED_ORIGINS` in the dashboard.
+4. The build ingests issuer-hosted Persistent/Crompton PDFs. After first boot, hit
+   `POST /api/demo/run` once to populate the feed.
+   - The SQLite DB is ephemeral on the free tier; startup restores the verified
+     research corpus and the demo pipeline is idempotent.
+5. Verify: `curl https://<backend-url>/healthz` → `research_ready: true`.
+
+Authenticated alternative: deploy `backend/` as its own Vercel FastAPI project. Set
+`HYDE_API_KEY`, `FINN_DB_PATH=/tmp/finn.db`, and `FINN_ALLOWED_ORIGINS`. This is useful
+for a grading preview but remains ephemeral serverless storage; Render is preferred
+for the scheduled job.
 
 ## Expo app
 
@@ -22,7 +28,8 @@ Two paths:
 **B. Published update (no dev server needed)**
 1. `npx expo login` then `npx eas update --branch production` (requires a free EAS
    account, `npx eas init` first).
-2. Share the update link / QR; it opens in Expo Go without any dev server.
+2. Share the update link / QR. Push notifications require an EAS project ID and a
+   development/preview build; Expo Go cannot guarantee remote push support.
 
 **Native build (optional)**: `npx eas build --profile preview --platform android`
 produces an installable APK; iOS needs an Apple developer account ($99) — skip for

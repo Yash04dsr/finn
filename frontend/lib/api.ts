@@ -10,6 +10,8 @@ import type {
   DigestResponse,
   FeedResponse,
   Settings,
+  SourceInfo,
+  SourceMap,
 } from "./types";
 
 export class ApiError extends Error {
@@ -141,16 +143,84 @@ function parseSseFrame(frame: string): ChatEvent | null {
   return null;
 }
 
-/** Extract "SOURCES:" block from final text → { text, sources } */
-export function splitSources(text: string): { text: string; sources: Record<string, string> } {
-  const idx = text.lastIndexOf("SOURCES:");
-  if (idx === -1) return { text, sources: {} };
-  const main = text.slice(0, idx).trimEnd();
-  const block = text.slice(idx + "SOURCES:".length);
-  const sources: Record<string, string> = {};
-  for (const line of block.split(/\r?\n/)) {
-    const m = line.match(/^\s*(S?\d+)\s*[:\-–]\s*(.+)$/);
-    if (m) sources[m[1].replace(/^S/, "")] = m[2].trim();
+/** Extract the agent's trailing SOURCES block into structured source metadata. */
+export function splitSources(text: string): { text: string; sources: SourceMap } {
+  const headings = Array.from(text.matchAll(/^#{0,6}\s*SOURCES\s*:?\s*$/gim));
+  const heading = headings.at(-1);
+  if (!heading || heading.index == null) return { text, sources: {} };
+
+  const main = text.slice(0, heading.index).trimEnd();
+  const block = text.slice(heading.index + heading[0].length);
+  const sources: SourceMap = {};
+  let current: SourceInfo | null = null;
+
+  for (const rawLine of block.split(/\r?\n/)) {
+    const parsed = parseSourceLine(rawLine);
+    if (parsed) {
+      sources[parsed.id] = parsed;
+      current = parsed;
+      continue;
+    }
+    if (!current) continue;
+
+    const url = rawLine.match(/^\s*(?:url|source)\s*[:=-]\s*(https?:\/\/\S+)\s*$/i);
+    if (url) {
+      current.url = trimUrl(url[1]);
+      continue;
+    }
+    const excerpt = rawLine.match(/^\s*(?:excerpt|quote)\s*[:=-]\s*(.+?)\s*$/i);
+    if (excerpt) current.excerpt = unquote(excerpt[1]);
   }
+
   return { text: main, sources };
+}
+
+function parseSourceLine(line: string): SourceInfo | null {
+  const match = line.match(/^\s*(?:[-*]\s*)?\[?S?(\d+)\]?\s*(?:(?:[:\-–—])\s*)?(.+?)\s*$/i);
+  if (!match) return null;
+
+  const id = match[1];
+  const parts = match[2].split(/\s+\|\s+/).map((part) => part.trim()).filter(Boolean);
+  let label = parts.shift() ?? `Source ${id}`;
+  const source: SourceInfo = { id, title: label };
+
+  const metadata = label.match(/^(.*?)\s+\(([^,()]+),\s*([^)]+)\)\s*$/);
+  if (metadata) {
+    source.title = metadata[1].trim();
+    source.doc_type = metadata[2].trim();
+    source.period = metadata[3].trim();
+  }
+
+  for (const part of parts) {
+    const url = part.match(/^(?:url|source)?\s*[:=]?\s*(https?:\/\/\S+)$/i);
+    if (url) {
+      source.url = trimUrl(url[1]);
+      continue;
+    }
+    const excerpt = part.match(/^(?:excerpt|quote)\s*[:=]\s*(.+)$/i);
+    if (excerpt) {
+      source.excerpt = unquote(excerpt[1]);
+      continue;
+    }
+    if (!source.excerpt) source.excerpt = unquote(part);
+  }
+
+  if (!source.url) {
+    const inlineUrl = label.match(/\bhttps?:\/\/\S+/i);
+    if (inlineUrl) {
+      source.url = trimUrl(inlineUrl[0]);
+      label = label.replace(inlineUrl[0], "").replace(/\s*[-–—|]\s*$/, "").trim();
+      source.title = label || source.title;
+    }
+  }
+
+  return source;
+}
+
+function trimUrl(value: string): string {
+  return value.replace(/[),.;]+$/, "");
+}
+
+function unquote(value: string): string {
+  return value.trim().replace(/^["“‘']|["”’']$/g, "");
 }

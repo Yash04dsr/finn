@@ -89,18 +89,56 @@ async def send_push(digest: dict, enriched: list[dict], threshold_alerts: list[d
 
 
 async def _send_expo(token: str, top: dict) -> bool:
-    """Expo push via HTTP API — no SDK dependency, just two POST fields."""
+    """Submit one Expo push and validate the returned push ticket."""
     import httpx
 
     try:
-        resp = await httpx.AsyncClient().post(
-            "https://exp.host/--/api/v2/push/send",
-            json={"to": token, "title": top["title"], "body": top["body"],
-                  "sound": "default",
-                  "data": {"url": top["url"]}},
-            timeout=10,
-        )
-        return resp.status_code == 200
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://exp.host/--/api/v2/push/send",
+                json={"to": token, "title": top["title"], "body": top["body"],
+                      "sound": "default",
+                      "data": {"url": top["url"]}},
+                headers={"Accept": "application/json"},
+                timeout=10,
+            )
+        if resp.status_code != 200:
+            log.warning("expo push HTTP %s: %s", resp.status_code, resp.text[:300])
+            return False
+
+        try:
+            payload = resp.json()
+        except (ValueError, json.JSONDecodeError):
+            log.warning("expo push returned invalid JSON")
+            return False
+
+        if not isinstance(payload, dict):
+            log.warning("expo push returned an unexpected body: %r", payload)
+            return False
+        if payload.get("errors"):
+            log.warning("expo push request errors: %r", payload["errors"])
+            return False
+
+        data = payload.get("data")
+        ticket = data[0] if isinstance(data, list) and len(data) == 1 else data
+        if not isinstance(ticket, dict):
+            log.warning("expo push response did not contain one ticket: %r", payload)
+            return False
+        if ticket.get("status") != "ok":
+            details = ticket.get("details")
+            error_code = details.get("error") if isinstance(details, dict) else None
+            log.warning(
+                "expo push ticket rejected: %s (%s)",
+                ticket.get("message", "unknown error"),
+                error_code or "no error code",
+            )
+            if error_code == "DeviceNotRegistered" and db.get_setting("expo_push_token") == token:
+                db.set_setting("expo_push_token", "")
+            return False
+        if not isinstance(ticket.get("id"), str) or not ticket["id"]:
+            log.warning("expo push success ticket had no receipt id: %r", ticket)
+            return False
+        return True
     except Exception as exc:
         log.warning("expo push failed: %s", exc)
         return False

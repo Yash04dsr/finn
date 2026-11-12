@@ -2,17 +2,18 @@
 
 FINN is a mobile-first financial investment agent built for the ENAM AI Engineer Build Challenge.
 It runs a daily **Push** loop (what changed across your portfolio, ranked so what matters is first
-and routine paperwork is collapsed) and a grounded **Pull** analyst that answers only from primary
-sources — annual reports, concall transcripts, results filings — with citations on every claim.
+and routine paperwork is collapsed) and a grounded **Pull** analyst that answers only from verified
+issuer-hosted primary sources — annual reports, concall transcripts, results filings — and refuses
+when that evidence is unavailable.
 
 Built on **Google's Agent Development Kit (ADK) v2.14** (multi-agent: a routing coordinator plus a
-grounded ResearchAnalyst), with deliberate **two-tier model routing** and a live **cost ledger**.
+grounded ResearchAnalyst), with deliberate **two-tier model routing** and a live **token-usage ledger**.
 
 ## Clients
 
-- **Expo app** (`mobile/`) — the primary experience: iOS/Android via Expo Go or a
-  published build, native push notifications through Expo push.
-- **Next.js PWA** (`frontend/`) — no-install web fallback, same API, same design.
+- **Expo app** (`mobile/`) — iOS/Android via Expo Go for local UI testing or an
+  EAS preview build for remote push notifications.
+- **Next.js PWA** (`frontend/`) — no-install web fallback using the same API.
 
 ## Quick start (3 minutes)
 
@@ -22,7 +23,7 @@ cd backend
 uv sync
 cp .env.example .env         # set HYDE_API_KEY (OpenAI-compatible gateway)
 uv run python -m finn.ingest.seed          # write demo snapshots
-uv run python -m finn.ingest.seed_docs     # seed hero-company transcripts
+uv run python -m finn.ingest.official_docs # ingest issuer-hosted PDFs for the research demo
 uv run uvicorn finn.api.main:app --port 8000
 
 # 2. Expo app (Node 20+)
@@ -58,8 +59,9 @@ batched) → deterministic threshold engine (user-configurable) → enrichers (r
 first-cut math in pure Python; exec bio via fast tier) → digest composer (priority-ranked,
 noise counted not shown) → web-push + in-app inbox. Pull side: ADK root agent (routes)
 → ResearchAnalyst sub-agent with function tools over an FTS5 corpus and a metrics tool —
-the model narrates numbers it never computes. Every LLM call is logged to a cost ledger
-surfaced in the UI. Next.js 15 PWA (dark, dense, tab-bar navigation) streams chat over SSE.
+the model narrates numbers it never computes. Provider-reported token usage is logged by
+routing tier and surfaced honestly as telemetry, not billed cost. The light Swiss-style
+Next.js 15 PWA streams chat over SSE.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture and
 [docs/DECISIONS.md](docs/DECISIONS.md) for what we deliberately left out.
@@ -76,7 +78,7 @@ backend/
   finn/api/main.py            # FastAPI: SSE chat over ADK Runner + REST
   finn/pipeline.py            # one EOD pass, end to end
   finn/scheduler.py           # APScheduler (18:30 IST, Mon–Fri)
-  tests/                      # 24 pytest cases (math, thresholds, classifier, FTS)
+  tests/                      # pytest suite (math, thresholds, integrity, API, push, FTS)
   evals/                      # grounding evals: cite-or-refuse contract
 mobile/                       # Expo (React Native) app — primary client
 frontend/                     # Next.js 15 PWA — fallback web client
@@ -96,6 +98,6 @@ User-configurable in-app: volume multiplier, price-move %, category watchlist, q
 ## Tests & evals
 
 ```bash
-cd backend && uv run pytest -q          # 24 tests
+cd backend && uv run pytest -q
 uv run python -m evals.run_evals        # grounding: cite-or-refuse contract (LLM keys needed)
 ```

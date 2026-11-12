@@ -23,7 +23,22 @@ def test_digest_ranks_and_collapses():
     assert digest["items"][1]["ticker"] == "D"
     # routine buried into stats, not shown
     assert digest["stats"]["hidden"] == 1
+    assert digest["stats"]["held_back"] == 0
+    assert digest["stats"]["shown"] + digest["stats"]["hidden"] + digest["stats"]["held_back"] == digest["stats"]["total"]
     assert all(i["ticker"] != "A" for i in digest["items"])
+
+
+def test_digest_counts_items_held_back_by_the_brief_cap():
+    enriched = [
+        {"ticker": f"T{i}", "category": "results", "headline": f"Results {i}",
+         "priority": 1, "filed_at": f"2026-11-11T{i % 10:02d}:00:00+00:00", "summary": "Revenue up"}
+        for i in range(13)
+    ]
+    digest = compose_digest(enriched, [], hours=24)
+    assert digest["stats"]["shown"] == 12
+    assert digest["stats"]["hidden"] == 0
+    assert digest["stats"]["held_back"] == 1
+    assert len(digest["items"]) == 12
 
 
 def test_fts_search_roundtrip():

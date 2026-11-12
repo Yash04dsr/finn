@@ -17,7 +17,7 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
   const { ticker: raw } = use(params);
   const ticker = decodeURIComponent(raw);
   const router = useRouter();
-  const { data, loading, error, reload } = useApi(
+  const { data, loading, error, notFound, reload } = useApi(
     useCallback((signal: AbortSignal) => fetchers.company(ticker)(signal), [ticker]),
     [ticker]
   );
@@ -32,7 +32,7 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
       <div className="flex items-center px-4 pt-3">
         <button
           onClick={() => router.push("/companies")}
-          className="press -ml-2 flex items-center gap-1 rounded-none px-2 py-1 text-[13px] font-medium text-[#4B5563]"
+          className="press -ml-2 flex min-h-11 items-center gap-1 rounded-none px-2 py-1 text-[13px] font-medium text-[#4B5563]"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden="true">
             <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
@@ -45,9 +45,11 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
         <div className="px-4 pt-4">
           <ListSkeleton rows={3} />
         </div>
+      ) : notFound || c?.available === false ? (
+        <UnavailableCompany ticker={ticker} />
       ) : error || !c ? (
         <div className="px-4 pt-4">
-          <ErrorRow message={error ? `Couldn't load ${ticker} — ${error}` : `No data for ${ticker} yet.`} onRetry={reload} />
+          <ErrorRow message={`Couldn't load ${ticker} research. Check your connection and try again.`} onRetry={reload} />
         </div>
       ) : (
         <>
@@ -55,15 +57,19 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
           <div className="px-4 pt-2">
             <div className="flex items-center gap-2.5">
               <span className="num rounded-none bg-[#000000]/[0.06] px-2 py-1 text-[15px] font-bold tracking-wide">{c.ticker}</span>
-              <div>
-                <span className="num block text-[20px] font-bold leading-none tabular-nums">{rupees(c.snapshot?.close)}</span>
-                <span
-                  className="num text-[12px] font-semibold"
-                  style={{ color: toneFor(c.snapshot?.change_pct) === "pos" ? "#1E6B4F" : toneFor(c.snapshot?.change_pct) === "neg" ? "#B4442C" : "#4B5563" }}
-                >
-                  {pct(c.snapshot?.change_pct)} · {shortDate(c.snapshot?.date)}
-                </span>
-              </div>
+              {c.snapshot ? (
+                <div>
+                  <span className="num block text-[20px] font-bold leading-none tabular-nums">{rupees(c.snapshot.close)}</span>
+                  <span
+                    className="num text-[12px] font-semibold"
+                    style={{ color: toneFor(c.snapshot.change_pct) === "pos" ? "#1E6B4F" : toneFor(c.snapshot.change_pct) === "neg" ? "#B4442C" : "#4B5563" }}
+                  >
+                    {pct(c.snapshot.change_pct)} · {shortDate(c.snapshot.date)}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-[12.5px] font-medium text-[#4B5563]">Latest price unavailable</p>
+              )}
             </div>
 
             {/* Grounded docs badges */}
@@ -79,10 +85,12 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
             {(["overview", "filings"] as const).map((t) => (
               <button
                 key={t}
+                id={`company-tab-${t}`}
                 role="tab"
                 aria-selected={tab === t}
+                aria-controls={`company-panel-${t}`}
                 onClick={() => setTab(t)}
-                className="press px-3.5 py-1.5 text-[12px] font-semibold capitalize transition-colors"
+                className="press min-h-11 px-3.5 py-1.5 text-[12px] font-semibold capitalize transition-colors"
                 style={
                   tab === t
                     ? { background: "#000000", color: "#FFFFFF" }
@@ -94,7 +102,12 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
             ))}
           </div>
 
-          <div className="space-y-3 px-4 pt-3.5">
+          <div
+            id={`company-panel-${tab}`}
+            role="tabpanel"
+            aria-labelledby={`company-tab-${tab}`}
+            className="space-y-3 px-4 pt-3.5"
+          >
             {tab === "overview" ? (
               <>
                 <div className="card p-4">
@@ -103,6 +116,11 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
                     <span className="text-[10.5px] text-[#4B5563]">last 8 quarters</span>
                   </div>
                   <RevenueChart quarterly={c.quarterly} />
+                  {c.quarterly.some((row) => row.source === "illustrative_snapshot") && (
+                    <p className="mt-3 border-t border-[#E5E7EB] pt-2 text-[10.5px] leading-relaxed text-[#4B5563]">
+                      Chart includes labelled illustrative fallback values where live fundamentals were unavailable.
+                    </p>
+                  )}
                 </div>
                 {c.portfolio_context?.revenue_yoy != null && c.portfolio_context?.portfolio_median_yoy != null && (
                   <PortfolioContext
@@ -124,7 +142,7 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
             <div className="mx-auto w-full max-w-[480px]">
               <button
                 onClick={() => router.push(`/chat?ticker=${encodeURIComponent(ticker)}`)}
-                className="press flex w-full items-center justify-center gap-2 rounded-none bg-black py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#1F2937]"
+                className="press flex min-h-11 w-full items-center justify-center gap-2 rounded-none bg-black px-3 py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#1F2937]"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
                   <path d="M12 2.5l1.9 5.1a2 2 0 0 0 1.2 1.2l5.1 1.9-5.1 1.9a2 2 0 0 0-1.2 1.2L12 18.9l-1.9-5.1a2 2 0 0 0-1.2-1.2L3.8 10.7l5.1-1.9a2 2 0 0 0 1.2-1.2L12 2.5Z" />
@@ -155,9 +173,39 @@ function PortfolioContext({ yoy, median }: { yoy: number; median: number }) {
         <b style={{ color: ahead ? "#1E6B4F" : "#B4442C" }}>
           {ahead ? `${delta.toFixed(1)} pts ahead` : `${Math.abs(delta).toFixed(1)} pts behind`}
         </b>{" "}
-        of your 17-company book.
+        of the tracked portfolio.
       </p>
     </div>
+  );
+}
+
+function UnavailableCompany({ ticker }: { ticker: string }) {
+  return (
+    <section className="px-4 pt-4" aria-labelledby="coverage-unavailable-title">
+      <div className="card p-5">
+        <h1 id="coverage-unavailable-title" className="text-[16px] font-bold text-[#000000]">Research unavailable for {ticker}</h1>
+        <p className="mt-1.5 text-[13px] leading-relaxed text-[#4B5563]">
+          FINN does not have tracked primary-source coverage for this ticker, so it will not generate an ungrounded company page.
+        </p>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <Link
+            href="/companies"
+            className="press inline-flex min-h-11 items-center justify-center border border-black px-4 text-[12px] font-semibold text-[#000000]"
+          >
+            Try another ticker
+          </Link>
+          <Link
+            href={`/chat?ticker=${encodeURIComponent(ticker)}`}
+            className="press inline-flex min-h-11 items-center justify-center bg-black px-4 text-[12px] font-semibold text-white"
+          >
+            Ask FINN about coverage
+          </Link>
+        </div>
+        <p className="mt-2 text-[11.5px] leading-relaxed text-[#4B5563]">
+          In chat, FINN will say when the available primary sources cannot answer your question.
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -186,7 +234,6 @@ function FilingsList({ filings }: { filings: CompanyResponse["filings"] }) {
             <span className="num ml-auto text-[11px] text-[#4B5563]">{shortDate(f.filed_at)}</span>
           </div>
           <p className="mt-1.5 text-[13.5px] font-medium leading-snug text-[#000000]">{f.headline}</p>
-          {f.summary && <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[#4B5563]">{f.summary}</p>}
         </div>
       ))}
       {filings.length > 8 && (

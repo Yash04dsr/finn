@@ -68,12 +68,12 @@ function anomalyExtra(a: Alert): React.ReactNode {
     threshold?: number;
     close?: number;
     change_pct?: number;
-    closes?: number[];
+    spark?: number[];
   };
   const isVol = a.kind === "volume_spike";
   return (
     <div className="mt-2 flex items-center gap-2.5">
-      {Array.isArray(p.closes) && p.closes.length > 2 ? <Sparkline data={p.closes} width={64} height={22} /> : null}
+      {Array.isArray(p.spark) && p.spark.length > 2 ? <Sparkline data={p.spark} width={64} height={22} /> : null}
       <span className="num text-[11.5px] text-[#4B5563]">
         {isVol ? (
           <>

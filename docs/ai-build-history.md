@@ -24,9 +24,10 @@ Every layer was made to prove itself before moving on:
 2. **The pipeline was run end-to-end repeatedly** against real LLM calls; output
    quality was *inspected*, which caught a thinking-model token-budget failure (empty
    content, reasoning-only responses) that tests alone would have missed.
-3. **31 pytest cases** pin the deterministic core (QoQ/YoY math, thresholds, classifier,
-   FTS, API contract). Several tests found real bugs (FTS sync, digest ordering,
-   test-seeding math) — those fixes are in the git history.
+3. The **pytest suite** pins deterministic math, thresholds, classification, source
+   integrity, push tickets, idempotency, FTS, and API contracts. Several tests found
+   real bugs (FTS sync, digest ordering, fiscal-quarter normalization, stale demo data)
+   — those fixes are in the git history.
 4. **A custom eval suite** (`evals/run_evals.py`) asserts the agent-level contract:
    grounded answers cite [S#] with the right numbers; out-of-corpus questions get
    refusals, not vibes. 3/3 passing.
@@ -48,6 +49,6 @@ Every layer was made to prove itself before moving on:
 ## Model usage
 
 - Cursor agent: planning, backend, delegation, verification.
-- FINN's own two-tier routing (fast/reasoning via the Hyde gateway) is documented in
-  docs/ARCHITECTURE.md; the cost ledger in the app is the live evidence of how many
-  tokens each layer uses.
+- FINN's two logical routing tiers are documented in `docs/ARCHITECTURE.md`; the
+  in-product usage ledger reports provider token metadata by tier. It deliberately
+  does not present token counts as billed monetary cost.

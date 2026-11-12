@@ -176,7 +176,7 @@ function TimeInput({ value, onChange }: { value: string; onChange: (v: string) =
       type="time"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="num rounded-none border border-[#000000]/[0.14] bg-[#FFFFFF] px-3 py-2 text-[13px] outline-none focus:border-black"
+      className="num rounded-none border border-[#000000]/[0.14] bg-[#FFFFFF] px-3 py-2 text-[16px] outline-none focus:border-black"
     />
   );
 }
@@ -184,7 +184,9 @@ function TimeInput({ value, onChange }: { value: string; onChange: (v: string) =
 /* ─── Push notifications ─────────────────────────────────────────────────── */
 
 function PushCard() {
-  const [state, setState] = useState<"idle" | "working" | "on" | "denied" | "unsupported">("idle");
+  const [state, setState] = useState<
+    "idle" | "working" | "on" | "denied" | "unsupported" | "failed"
+  >("idle");
 
   const enable = async () => {
     if (typeof window === "undefined") return;
@@ -200,17 +202,21 @@ function PushCard() {
         return;
       }
       const reg = await navigator.serviceWorker.ready;
+      const keyRes = await fetch("/api/push/key");
+      if (!keyRes.ok) throw new Error("VAPID key unavailable");
+      const { public_key: publicKey } = await keyRes.json() as { public_key?: string };
+      if (!publicKey) throw new Error("VAPID key unavailable");
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
-        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, userVisibleKey: undefined } as PushSubscriptionOptionsInit).catch(async () => {
-          // Some browsers require an applicationServerKey; retry bare.
-          return reg.pushManager.subscribe({ userVisibleOnly: true } as PushSubscriptionOptionsInit);
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
       }
       await api.pushSubscribe(sub.toJSON());
       setState("on");
     } catch {
-      setState("idle"); // non-blocking: push is best-effort
+      setState("failed");
     }
   };
 
@@ -219,6 +225,7 @@ function PushCard() {
     state === "on" ? "Push notifications enabled" :
     state === "denied" ? "Permission denied — enable in browser settings" :
     state === "unsupported" ? "Push not supported on this browser" :
+    state === "failed" ? "Couldn’t enable push — retry" :
     "Enable push notifications";
 
   return (
@@ -229,7 +236,7 @@ function PushCard() {
       </p>
       <button
         onClick={enable}
-        disabled={state === "working" || state === "on"}
+        disabled={state === "working" || state === "on" || state === "denied" || state === "unsupported"}
         className="press mt-3 flex w-full items-center justify-center gap-2 rounded-none border border-black bg-transparent py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-black hover:bg-black hover:text-white disabled:opacity-40"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4" aria-hidden="true">
@@ -241,19 +248,31 @@ function PushCard() {
   );
 }
 
+function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  const bytes = new Uint8Array(new ArrayBuffer(raw.length));
+  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}
+
 /* ─── Cost dashboard ─────────────────────────────────────────────────────── */
 
 function CostDashboard() {
   const { data, error } = useApiSafe<CostsResponse>(useCallback((s: AbortSignal) => api.costs(s), []));
 
   return (
-    <section className="card mb-4 p-4" aria-label="Cost dashboard">
+    <section className="card mb-4 p-4" aria-label="Token usage ledger">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold text-[#000000]">Cost dashboard</h2>
+        <h2 className="text-[13px] font-semibold text-[#000000]">Token usage</h2>
         {data && (
           <span className="num text-[12px] font-semibold text-[#000000]">{compactNum(data.total_tokens)} tokens</span>
         )}
       </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-[#4B5563]">
+        Provider-reported tokens by routing tier. This is usage telemetry, not billed cost.
+      </p>
 
       {error && <p className="mt-2 text-[11.5px] text-[#4B5563]">Cost data unavailable — backend offline.</p>}
 

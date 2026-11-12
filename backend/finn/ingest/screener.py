@@ -77,7 +77,9 @@ def scrape_quarterly(ticker: str) -> list[dict] | None:
                 "pat": col("pat"),
                 "source": "screener",
             })
-        return rows[-8:]  # last 8 quarters
+        rows = [row for row in rows if row["period_end"]]
+        rows.sort(key=lambda row: row["period_end"])
+        return rows[-8:]  # last 8 quarters, oldest to newest
     except Exception as exc:
         log.warning("Screener scrape failed for %s: %s", ticker, exc)
         return None
@@ -95,24 +97,57 @@ def _parse_num(s: str) -> float | None:
 
 def _period_label(s: str) -> str:
     """'Sep 2025' -> 'Q2FY26'; Indian FY ends March, so Q1=Jun, Q2=Sep, Q3=Dec, Q4=Mar."""
-    m = re.match(r"([A-Za-z]{3})\s+(\d{4})", s.strip())
+    m = re.fullmatch(r"([A-Za-z]{3})\s+(\d{4})", s.strip())
     if not m:
         return s
     mon, year = m.group(1).title(), int(m.group(2))
     month_q = {"Jun": 1, "Sep": 2, "Dec": 3, "Mar": 4}
     q = month_q.get(mon)
-    fy = year + 1 if mon in ("Jan", "Feb", "Mar") else year
     if q is None:
         return s
+    fy = year if mon == "Mar" else year + 1
     return f"Q{q}FY{str(fy)[-2:]}"
 
 
 def _period_end_iso(s: str) -> str:
-    m = re.match(r"([A-Za-z]{3})\s+(\d{4})", s.strip())
+    m = re.fullmatch(r"([A-Za-z]{3})\s+(\d{4})", s.strip())
     if not m:
         return ""
-    end_day = {"Jun": "30", "Sep": "30", "Dec": "31", "Mar": "31"}
-    return f"{m.group(2)}-{'Jun Sep Dec Mar'.split()[['Jun','Sep','Dec','Mar'].index(m.group(1).title())]}-{end_day.get(m.group(1).title(), '30')}" if m.group(1).title() in ("Jun", "Sep", "Dec", "Mar") else s
+    mon = m.group(1).title()
+    month_day = {
+        "Mar": ("03", "31"),
+        "Jun": ("06", "30"),
+        "Sep": ("09", "30"),
+        "Dec": ("12", "31"),
+    }
+    if mon not in month_day:
+        return ""
+    month, day = month_day[mon]
+    return f"{m.group(2)}-{month}-{day}"
+
+
+def _normalise_quarterly_rows(rows: list[dict]) -> list[dict]:
+    """Canonicalise fiscal labels/dates and sort chronologically for persistence."""
+    normalised = []
+    for row in rows:
+        period = str(row.get("period") or "").upper()
+        match = re.fullmatch(r"Q([1-4])FY(\d{2})", period)
+        if not match:
+            log.warning("dropping quarterly row with invalid period: %r", period)
+            continue
+        quarter, fy_short = int(match.group(1)), int(match.group(2))
+        fy_year = 2000 + fy_short
+        period_end = {
+            1: f"{fy_year - 1:04d}-06-30",
+            2: f"{fy_year - 1:04d}-09-30",
+            3: f"{fy_year - 1:04d}-12-31",
+            4: f"{fy_year:04d}-03-31",
+        }[quarter]
+        canonical = dict(row)
+        canonical["period"] = period
+        canonical["period_end"] = period_end
+        normalised.append(canonical)
+    return sorted(normalised, key=lambda row: row["period_end"])
 
 
 def load_quarterly_snapshot(ticker: str) -> list[dict] | None:
@@ -132,6 +167,11 @@ def ingest_quarterly(ticker: str) -> str:
     if not rows:
         rows = load_quarterly_snapshot(ticker)
         mode = "snapshot"
+    if rows:
+        rows = _normalise_quarterly_rows(rows)
+        provenance = "screener_live" if mode == "live" else "illustrative_snapshot"
+        for row in rows:
+            row["source"] = provenance
     if rows:
         db.put_quarterly(ticker, rows)
     return mode if rows else "none"

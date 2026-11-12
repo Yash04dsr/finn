@@ -38,6 +38,8 @@ def first_cut(ticker: str) -> dict | None:
         "period": latest["period"],
         "prev_period": prev_q["period"],
         "yoy_period": yoy["period"] if yoy else None,
+        "source": latest.get("source", "unknown"),
+        "is_illustrative": latest.get("source") == "illustrative_snapshot",
         "metrics": metrics,
         "margins": margins_for(ticker),
     }

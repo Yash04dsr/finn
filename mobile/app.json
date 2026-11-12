@@ -9,9 +9,11 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.enamholding.finn"
     },
     "android": {
+      "package": "com.enamholding.finn",
       "adaptiveIcon": {
         "backgroundColor": "#0A0E14",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -26,6 +28,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {

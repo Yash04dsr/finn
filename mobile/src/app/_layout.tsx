@@ -1,14 +1,18 @@
 /**
  * Root layout — dark theme, safe-area, stack with tabs + alert modal.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
+import { routeNotificationResponse } from '../../lib/notifications';
 
 export default function RootLayout() {
+  const handledResponses = useRef(new Set<string>());
+
   useEffect(() => {
     // Ensure Android nav bar / iOS background stay dark.
     try {
@@ -18,6 +22,23 @@ export default function RootLayout() {
     } catch {
       // non-fatal
     }
+  }, []);
+
+  useEffect(() => {
+    const handleResponse = (response: Notifications.NotificationResponse) => {
+      const key = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+      if (handledResponses.current.has(key)) return;
+      handledResponses.current.add(key);
+      if (routeNotificationResponse(response)) {
+        void Notifications.clearLastNotificationResponseAsync();
+      }
+    };
+
+    const lastResponse = Notifications.getLastNotificationResponse();
+    if (lastResponse) handleResponse(lastResponse);
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    return () => subscription.remove();
   }, []);
 
   return (

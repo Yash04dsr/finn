@@ -46,7 +46,7 @@ export function ErrorRow({ message, onRetry }: { message: string; onRetry?: () =
       {onRetry && (
         <button
           onClick={onRetry}
-          className="press border border-white/10 px-4 py-1.5 text-[12px] font-semibold text-[#000000]"
+          className="press min-h-11 border border-black/30 px-4 py-2 text-[12px] font-semibold text-[#000000]"
         >
           Retry
         </button>

@@ -7,7 +7,9 @@ Every call records token usage into the cost ledger — cost discipline is a fea
 """
 from __future__ import annotations
 
+import json
 import os
+import re
 
 from .. import db
 from ..config import HYDE_API_KEY, HYDE_BASE_URL, MODEL_FAST, MODEL_REASONING
@@ -42,62 +44,105 @@ def record_usage(scope: str, tier: str, usage) -> dict:
     """Pull token usage off a LiteLLM/ADK response and log it to the cost ledger."""
     usage_dict = {"prompt_tokens": 0, "completion_tokens": 0}
     try:
-        usage_dict["prompt_tokens"] = getattr(usage, "prompt_tokens", 0) or 0
-        usage_dict["completion_tokens"] = getattr(usage, "completion_tokens", 0) or 0
+        usage_dict["prompt_tokens"] = (
+            getattr(usage, "prompt_tokens", None)
+            or getattr(usage, "prompt_token_count", 0)
+            or 0
+        )
+        usage_dict["completion_tokens"] = (
+            getattr(usage, "completion_tokens", None)
+            or getattr(usage, "candidates_token_count", 0)
+            or 0
+        )
     except Exception:
         pass
     db.log_cost(scope, model_for(tier), usage_dict["prompt_tokens"],
-                usage_dict["completion_tokens"])
+                usage_dict["completion_tokens"], tier=tier)
     return usage_dict
 
 
 def strip_think(text: str) -> str:
-    """Extract the visible answer from a thinking model's output."""
-    if "</think>" in text:
-        text = text.split("</think>", 1)[1]
+    """Return only user-facing output, never model scratch work.
+
+    Complete think blocks are removed. Unclosed think blocks are rejected because
+    there is no deterministic boundary between private reasoning and an answer.
+    """
+    if not isinstance(text, str):
+        return ""
+    private_tag = r"(?:think|analysis|reasoning|scratchpad)"
+    text = re.sub(rf"<{private_tag}\b[^>]*>.*?</{private_tag}\s*>", "", text,
+                  flags=re.IGNORECASE | re.DOTALL)
+    if re.search(rf"</?{private_tag}\b", text, flags=re.IGNORECASE):
+        return ""
     return _trim_to_answer(text)
 
 
 def _trim_to_answer(text: str) -> str:
-    """Reasoning-salvage mode: take the best span, dropping meta-commentary."""
-    # 1. If a complete JSON object exists anywhere, return it whole.
-    if "{" in text and "}" in text:
-        start, end = text.index("{"), text.rindex("}")
-        candidate = text[start:end + 1]
-        try:
-            import json as _json
-            _json.loads(candidate)
-            return candidate
-        except (ValueError, JSONDecodeError):
-            pass
-    lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
-    if not lines:
+    """Filter common scratch/meta lines while preserving a visible answer."""
+    text = text.strip()
+    if not text:
         return ""
-    # 2. Prefer a quoted draft (the model often rehearses in quotes).
-    import re
-    quoted = re.findall(r'"([^"]{20,})"', text)
-    if quoted:
-        return max(quoted, key=len).strip()
-    # 3. Drop obvious meta lines and take the longest remaining line.
-    meta = ("count", "words:", "word count", "that's", "options:", "let me", "i'll",
-            "wait", "check:", "hmm", "actually", "total:", "draft:", "answer:")
-    candidates = [l for l in lines
-                  if not any(m in l.lower()[:14] for m in meta)]
-    pool = candidates or lines
-    return max(pool, key=len)
+
+    # Structured callers need the object, not prose the model may put around it.
+    for start in (match.start() for match in re.finditer(r"\{", text)):
+        candidate = text[start:]
+        try:
+            value, end = json.JSONDecoder().raw_decode(candidate)
+        except json.JSONDecodeError:
+            pass
+        else:
+            if isinstance(value, (dict, list)):
+                return "" if _contains_meta_text(value) else candidate[:end]
+
+    safe_lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or _is_meta_line(line):
+            continue
+        # Models sometimes append a counter to an otherwise valid answer.
+        line = re.split(r"\s*(?:\||[-–—])?\s*(?:count\s+words?|word\s+count)\s*:",
+                        line, maxsplit=1, flags=re.IGNORECASE)[0].strip()
+        if line:
+            safe_lines.append(line)
+    return "\n".join(safe_lines)
 
 
-class JSONDecodeError(ValueError):
-    pass
+_META_LINE = re.compile(
+    r"^(?:"
+    r"(?:count\s+words?|word\s+count|token\s+count|total\s+words?)\s*:"
+    r"|(?:analysis|reasoning|thinking|thought|scratchpad|plan|check|draft|final\s+answer|answer)\s*:"
+    r"|(?:let\s+me|let's|i(?:'ll|\s+will|\s+should|\s+need\s+to)|we\s+need\s+to)\b"
+    r"|need\s+to\b"
+    r"|(?:the\s+user|user\s+asks?|system\s+prompt)\b"
+    r"|(?:hmm+|wait|actually|checking|options?)\b"
+    r")",
+    flags=re.IGNORECASE,
+)
+
+
+def _is_meta_line(line: str) -> bool:
+    """Whether a line is recognisable model process rather than an answer."""
+    return bool(_META_LINE.match(line.strip()))
+
+
+def _contains_meta_text(value) -> bool:
+    """Reject structured output whose keys or values contain model scratch text."""
+    if isinstance(value, str):
+        return any(_is_meta_line(line) for line in value.splitlines() if line.strip())
+    if isinstance(value, dict):
+        return any(_contains_meta_text(key) or _contains_meta_text(item)
+                   for key, item in value.items())
+    if isinstance(value, list):
+        return any(_contains_meta_text(item) for item in value)
+    return False
 
 
 async def chat(tier: str, messages: list[dict], scope: str, json_mode: bool = False,
                max_tokens: int = 700, temperature: float = 0.2) -> str:
     """One-shot completion through the routing layer (used by pipeline steps, not ADK).
 
-    The Hyde fast model is a thinking model: it can burn the whole token budget
-    on invisible reasoning. We therefore budget headroom, and if visible content
-    comes back empty we salvage the final line of the reasoning trace.
+    The Hyde fast model is a thinking model, so the token budget includes
+    headroom. Private reasoning is never promoted to visible output.
     """
     import litellm
 
@@ -113,9 +158,4 @@ async def chat(tier: str, messages: list[dict], scope: str, json_mode: bool = Fa
     record_usage(scope, tier, resp.usage)
     choice = resp.choices[0]
     content = choice.message.content or ""
-    if not content.strip():
-        reasoning = getattr(choice.message, "reasoning_content", None) or ""
-        if reasoning:
-            tail = [l for l in reasoning.strip().splitlines() if l.strip()]
-            content = tail[-1] if tail else ""
     return strip_think(content)

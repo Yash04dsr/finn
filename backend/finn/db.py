@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import sqlite3
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .config import DB_PATH
+from .config import BUNDLED_DB_PATH, DB_PATH
 
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None
@@ -68,6 +70,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     payload TEXT NOT NULL,           -- JSON
     priority INTEGER NOT NULL,       -- 1 = highest
     why TEXT DEFAULT '',             -- explainability string
+    source_key TEXT DEFAULT '',       -- stable idempotency key for pipeline reruns
     created_at TEXT DEFAULT (datetime('now')),
     read INTEGER DEFAULT 0
 );
@@ -78,6 +81,7 @@ CREATE TABLE IF NOT EXISTS digests (
     window_start TEXT NOT NULL,
     window_end TEXT NOT NULL,
     rendered TEXT NOT NULL,          -- final digest payload JSON
+    source_key TEXT DEFAULT '',       -- stable idempotency key for pipeline reruns
     created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -85,6 +89,7 @@ CREATE TABLE IF NOT EXISTS cost_ledger (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     scope TEXT NOT NULL,             -- digest | research | classifier | enrichment
     model TEXT NOT NULL,
+    tier TEXT DEFAULT '',             -- fast | reasoning (model names may be identical)
     prompt_tokens INTEGER DEFAULT 0,
     completion_tokens INTEGER DEFAULT 0,
     usd_cost REAL DEFAULT 0,
@@ -103,12 +108,44 @@ def _get_conn() -> sqlite3.Connection:
     with _lock:
         if _conn is None:
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+            if (
+                DB_PATH != BUNDLED_DB_PATH
+                and not DB_PATH.exists()
+                and BUNDLED_DB_PATH.exists()
+                and (
+                    os.getenv("VERCEL") == "1"
+                    or os.getenv("FINN_COPY_BUNDLED_DB") == "1"
+                )
+            ):
+                shutil.copy2(BUNDLED_DB_PATH, DB_PATH)
             _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
             _conn.row_factory = sqlite3.Row
             _conn.execute("PRAGMA journal_mode=WAL")
             _conn.executescript(SCHEMA)
+            _migrate_schema(_conn)
             _conn.commit()
     return _conn
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Apply additive migrations for databases created by earlier demo builds."""
+    migrations = {
+        "alerts": ("source_key", "TEXT DEFAULT ''"),
+        "digests": ("source_key", "TEXT DEFAULT ''"),
+        "cost_ledger": ("tier", "TEXT DEFAULT ''"),
+    }
+    for table, (column, ddl) in migrations.items():
+        columns = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_alerts_source_key "
+        "ON alerts(source_key) WHERE source_key <> ''"
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_digests_source_key "
+        "ON digests(source_key) WHERE source_key <> ''"
+    )
 
 
 @contextmanager
@@ -130,14 +167,21 @@ def now_iso() -> str:
 
 def upsert_filing(ticker: str, category: str, headline: str, body: str,
                   filed_at: str, source: str = "nse", is_demo: bool = False) -> bool:
-    """Insert a filing if new. Returns True if inserted."""
+    """Insert or refresh a filing. Returns True only when it was newly inserted."""
     with db() as c:
-        cur = c.execute(
-            "INSERT OR IGNORE INTO filings(ticker, category, headline, body, source, filed_at, is_demo)"
-            " VALUES(?,?,?,?,?,?,?)",
+        existed = c.execute(
+            "SELECT 1 FROM filings WHERE ticker=? AND headline=? AND filed_at=?",
+            (ticker, headline, filed_at),
+        ).fetchone() is not None
+        c.execute(
+            "INSERT INTO filings(ticker, category, headline, body, source, filed_at, is_demo)"
+            " VALUES(?,?,?,?,?,?,?)"
+            " ON CONFLICT(ticker, headline, filed_at) DO UPDATE SET"
+            " category=excluded.category, body=excluded.body, source=excluded.source,"
+            " is_demo=excluded.is_demo",
             (ticker, category, headline, body, source, filed_at, int(is_demo)),
         )
-        return cur.rowcount > 0
+        return not existed
 
 
 def filings_since(since_iso: str, tickers: list[str] | None = None) -> list[dict]:
@@ -207,6 +251,17 @@ def search_chunks(ticker: str, query: str, doc_type: str | None = None,
             if doc_type:
                 sql += " AND doc_type=?"
                 args.append(doc_type)
+            tokens = [
+                token for token in query.replace('"', " ").replace("'", " ").split()
+                if len(token) >= 3
+            ][:8]
+            if tokens:
+                sql += " AND (" + " OR ".join(
+                    "(LOWER(text) LIKE ? OR LOWER(doc_title) LIKE ?)" for _ in tokens
+                ) + ")"
+                for token in tokens:
+                    like = f"%{token.lower()}%"
+                    args.extend((like, like))
             sql += " ORDER BY id LIMIT ?"
             args.append(limit)
             rows = c.execute(sql, args).fetchall()
@@ -264,6 +319,24 @@ def chunks_for(ticker: str, doc_type: str | None = None, limit: int = 40) -> lis
     return [dict(r) for r in rows]
 
 
+def retain_chunks(ticker: str, trusted_titles: set[str]) -> int:
+    """Delete non-trusted document chunks for a ticker and rebuild FTS."""
+    with db() as c:
+        if trusted_titles:
+            placeholders = ",".join("?" for _ in trusted_titles)
+            args = [ticker, *sorted(trusted_titles)]
+            cur = c.execute(
+                f"DELETE FROM chunks WHERE ticker=? AND doc_title NOT IN ({placeholders})",
+                args,
+            )
+        else:
+            cur = c.execute("DELETE FROM chunks WHERE ticker=?", (ticker,))
+        deleted = cur.rowcount
+    if deleted:
+        ensure_fts()
+    return deleted
+
+
 # --- prices ---------------------------------------------------------------------
 
 def put_price(ticker: str, date: str, close: float, volume: float) -> None:
@@ -307,13 +380,28 @@ def quarterly_series(ticker: str, limit: int = 8) -> list[dict]:
 
 # --- alerts / feed ---------------------------------------------------------------
 
-def add_alert(ticker: str, kind: str, payload: dict, priority: int, why: str = "") -> int:
+def add_alert(ticker: str, kind: str, payload: dict, priority: int, why: str = "",
+              source_key: str = "") -> int:
+    """Store one alert; a non-empty source_key makes repeated pipeline runs idempotent."""
     with db() as c:
         cur = c.execute(
-            "INSERT INTO alerts(ticker, kind, payload, priority, why) VALUES(?,?,?,?,?)",
-            (ticker, kind, json.dumps(payload), priority, why),
+            "INSERT OR IGNORE INTO alerts(ticker, kind, payload, priority, why, source_key)"
+            " VALUES(?,?,?,?,?,?)",
+            (ticker, kind, json.dumps(payload), priority, why, source_key),
         )
-        return cur.lastrowid
+        if cur.rowcount:
+            return cur.lastrowid
+        row = c.execute("SELECT id FROM alerts WHERE source_key=?", (source_key,)).fetchone()
+        return int(row["id"]) if row else 0
+
+
+def alert_source_exists(source_key: str) -> bool:
+    if not source_key:
+        return False
+    with db() as c:
+        return c.execute(
+            "SELECT 1 FROM alerts WHERE source_key=? LIMIT 1", (source_key,)
+        ).fetchone() is not None
 
 
 def feed(since_hours: int = 24, include_read: bool = False) -> list[dict]:
@@ -344,13 +432,18 @@ def mark_all_read() -> None:
 
 # --- digests ---------------------------------------------------------------------
 
-def save_digest(window_start: str, window_end: str, rendered: dict) -> int:
+def save_digest(window_start: str, window_end: str, rendered: dict,
+                source_key: str = "") -> int:
     with db() as c:
         cur = c.execute(
-            "INSERT INTO digests(window_start, window_end, rendered) VALUES(?,?,?)",
-            (window_start, window_end, json.dumps(rendered)),
+            "INSERT OR IGNORE INTO digests(window_start, window_end, rendered, source_key)"
+            " VALUES(?,?,?,?)",
+            (window_start, window_end, json.dumps(rendered), source_key),
         )
-        return cur.lastrowid
+        if cur.rowcount:
+            return cur.lastrowid
+        row = c.execute("SELECT id FROM digests WHERE source_key=?", (source_key,)).fetchone()
+        return int(row["id"]) if row else 0
 
 
 def latest_digest() -> dict | None:
@@ -366,30 +459,29 @@ def latest_digest() -> dict | None:
 # --- cost ledger ------------------------------------------------------------------
 
 def log_cost(scope: str, model: str, prompt_tokens: int, completion_tokens: int,
-             usd_cost: float = 0.0) -> None:
+             usd_cost: float = 0.0, tier: str = "") -> None:
     with db() as c:
         c.execute(
-            "INSERT INTO cost_ledger(scope, model, prompt_tokens, completion_tokens, usd_cost)"
-            " VALUES(?,?,?,?,?)",
-            (scope, model, prompt_tokens, completion_tokens, usd_cost),
+            "INSERT INTO cost_ledger(scope, model, tier, prompt_tokens, completion_tokens, usd_cost)"
+            " VALUES(?,?,?,?,?,?)",
+            (scope, model, tier, prompt_tokens, completion_tokens, usd_cost),
         )
 
 
 def cost_summary() -> dict:
     with db() as c:
         rows = c.execute(
-            "SELECT scope, model, SUM(prompt_tokens) pt, SUM(completion_tokens) ct,"
-            " COUNT(*) calls FROM cost_ledger GROUP BY scope, model"
+            "SELECT scope, model, tier, SUM(prompt_tokens) pt, SUM(completion_tokens) ct,"
+            " COUNT(*) calls FROM cost_ledger GROUP BY scope, model, tier"
         ).fetchall()
         total = c.execute(
             "SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) FROM cost_ledger"
         ).fetchone()[0]
     by_row = [dict(r) for r in rows]
-    # Group by pipeline scope for the UI: classification/enrichment = bulk fast work,
-    # research = the analyst. Routing tier is tracked per scope.
+    # Prefer the explicitly recorded tier. Legacy rows fall back to their scope.
     tiers: dict[str, int] = {}
     for r in by_row:
-        tier = "reasoning" if r["scope"] == "research" else "fast"
+        tier = r["tier"] or ("reasoning" if r["scope"] == "research" else "fast")
         tiers[tier] = tiers.get(tier, 0) + r["pt"] + r["ct"]
     return {"by_scope_model": by_row, "total_tokens": total, "by_tier": tiers}
 

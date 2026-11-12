@@ -159,7 +159,10 @@ def scorecard(ticker: str) -> dict:
     quarterly series → grade. Citations point at the transcript chunk (chunk_id
     maps to the S# the RAG layer would assign).
     """
-    series = db.quarterly_series(ticker, limit=8)
+    series = [
+        row for row in db.quarterly_series(ticker, limit=8)
+        if row.get("source") != "illustrative_snapshot"
+    ]
     claims_raw = _claims_for_ticker(ticker)
     latest_period = series[-1]["period"] if series else None
 

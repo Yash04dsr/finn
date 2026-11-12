@@ -111,6 +111,21 @@ export default function CompanyDetailScreen() {
           />
         ) : loading || !data ? (
           <ListSkeleton rows={6} />
+        ) : data.available === false ? (
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: radius.lg,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: 16,
+            }}
+          >
+            <Text style={type.h2}>Research unavailable for {ticker}</Text>
+            <Text style={[type.body, { color: colors.muted, marginTop: 8 }]}>
+              FINN does not have a listed quote or primary-source coverage for this ticker, so it will not generate an ungrounded company page.
+            </Text>
+          </View>
         ) : (
           <>
             {/* grounded docs badges */}
@@ -210,7 +225,7 @@ export default function CompanyDetailScreen() {
             })}
           >
             <Text style={{ color: '#04130C', fontWeight: '700', fontSize: 14.5 }}>
-              Research {ticker} with FINN
+              {data.available === false ? `Ask FINN about ${ticker} coverage` : `Research ${ticker} with FINN`}
             </Text>
           </Pressable>
         </View>

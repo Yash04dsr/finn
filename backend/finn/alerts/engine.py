@@ -11,7 +11,9 @@ Deliberately pure Python + SQL: math over numbers is not an LLM job.
 from __future__ import annotations
 
 import statistics
+import re
 from datetime import datetime, time, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .. import db
 
@@ -22,6 +24,14 @@ DEFAULTS = {
                          "fund_raise", "insider_trading", "pledging", "capex"],
     "quiet_hours_start": "22:00",
     "quiet_hours_end": "07:00",
+    "timezone": "Asia/Kolkata",
+}
+
+ALLOWED_CATEGORIES = {
+    "results", "M&A", "fund_raise", "management_change", "litigation",
+    "insider_trading", "earnings_call", "investor_meetings", "credit_rating",
+    "dividend", "bonus_split", "capex", "press_release", "postal_ballot",
+    "agm_egm", "pledging", "unclassified",
 }
 
 
@@ -33,15 +43,22 @@ def get_thresholds() -> dict:
 
 def set_thresholds(update: dict) -> dict:
     current = get_thresholds()
-    for k in ("volume_multiplier", "price_move_pct"):
-        if k in update:
-            current[k] = float(update[k])
+    if "volume_multiplier" in update:
+        current["volume_multiplier"] = min(10.0, max(1.1, float(update["volume_multiplier"])))
+    if "price_move_pct" in update:
+        current["price_move_pct"] = min(25.0, max(0.5, float(update["price_move_pct"])))
     if "categories_watch" in update and isinstance(update["categories_watch"], list):
         current["categories_watch"] = [c for c in update["categories_watch"]
-                                       if isinstance(c, str)]
+                                       if isinstance(c, str) and c in ALLOWED_CATEGORIES]
     for k in ("quiet_hours_start", "quiet_hours_end"):
-        if k in update:
+        if k in update and re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", str(update[k])):
             current[k] = str(update[k])
+    if "timezone" in update:
+        try:
+            ZoneInfo(str(update["timezone"]))
+            current["timezone"] = str(update["timezone"])
+        except ZoneInfoNotFoundError:
+            pass
     db.set_json_setting("thresholds", current)
     return current
 
@@ -86,7 +103,7 @@ def check_price_volume(ticker: str, thresholds: dict | None = None) -> list[dict
             "payload": {"metric": "volume_ratio", "value": stats["volume_ratio"],
                         "threshold": th["volume_multiplier"], "close": stats["close"],
                         "change_pct": stats["change_pct"], "avg_volume": stats["avg_volume"],
-                        "spark": stats["spark"]},
+                        "spark": stats["spark"], "date": stats["date"]},
         })
     if abs(stats["change_pct"]) >= th["price_move_pct"]:
         alerts.append({
@@ -97,7 +114,7 @@ def check_price_volume(ticker: str, thresholds: dict | None = None) -> list[dict
                     f"±{th['price_move_pct']}%."),
             "payload": {"metric": "change_pct", "value": stats["change_pct"],
                         "threshold": th["price_move_pct"], "close": stats["close"],
-                        "spark": stats["spark"]},
+                        "spark": stats["spark"], "date": stats["date"]},
         })
     return alerts
 
@@ -125,6 +142,10 @@ def announcement_priority(category: str, importance_hint: int | None = None,
 def in_quiet_hours(ts: datetime | None = None) -> bool:
     th = get_thresholds()
     ts = ts or datetime.now(timezone.utc)
+    try:
+        ts = ts.astimezone(ZoneInfo(th.get("timezone", "Asia/Kolkata")))
+    except ZoneInfoNotFoundError:
+        ts = ts.astimezone(timezone.utc)
     start = _parse_hhmm(th["quiet_hours_start"])
     end = _parse_hhmm(th["quiet_hours_end"])
     t = ts.time()

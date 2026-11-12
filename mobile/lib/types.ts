@@ -56,7 +56,7 @@ export interface DigestPayload {
   title: string;
   window_hours: number;
   items: DigestItem[];
-  stats: { total: number; shown: number; hidden: number };
+  stats: { total: number; shown: number; hidden: number; held_back?: number };
 }
 
 export interface Alert {
@@ -112,6 +112,8 @@ export interface FilingRef {
 
 export interface CompanyDetail {
   ticker: string;
+  tracked?: boolean;
+  available?: boolean;
   snapshot: { ticker: string; date: string; close: number; change_pct: number } | null;
   quarterly: Quarter[];
   filings: FilingRef[];

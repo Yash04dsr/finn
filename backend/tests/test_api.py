@@ -24,6 +24,14 @@ def test_settings_roundtrip_api(client):
     client.post("/api/settings", json={"volume_multiplier": 2.5})
 
 
+def test_health_reports_research_readiness(client):
+    r = client.get("/healthz")
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert isinstance(r.json()["research_chunks"], int)
+    assert isinstance(r.json()["research_ready"], bool)
+
+
 def test_companies_shape(client):
     r = client.get("/api/companies")
     assert r.status_code == 200
@@ -33,9 +41,20 @@ def test_companies_shape(client):
     assert {"ticker", "close", "change_pct"} <= set(d["portfolio"][0])
 
 
-def test_company_404(client):
+def test_untracked_company_degrades_gracefully(client, monkeypatch):
+    async def no_network(_ticker):
+        return None
+
+    monkeypatch.setattr("finn.api.main._hydrate_company", no_network)
     r = client.get("/api/company/NOTREAL")
-    assert r.status_code == 404
+    assert r.status_code == 200
+    assert r.json()["tracked"] is False
+    assert r.json()["available"] is False
+
+
+def test_company_rejects_malformed_ticker(client):
+    r = client.get("/api/company/not%20a%20ticker!")
+    assert r.status_code == 400
 
 
 def test_company_shape(client):
@@ -54,8 +73,22 @@ def test_push_subscribe_expo(client):
     assert r2.status_code == 400
 
 
+def test_web_push_subscription_is_validated(client):
+    valid = {
+        "endpoint": "https://push.example.test/subscription",
+        "keys": {"p256dh": "public-key", "auth": "auth-secret"},
+    }
+    assert client.post("/api/push/subscribe", json=valid).status_code == 200
+    assert client.post("/api/push/subscribe", json={"endpoint": "javascript:x"}).status_code == 400
+
+
 def test_chat_requires_message(client):
     r = client.post("/api/chat", json={"message": ""})
+    assert r.status_code == 400
+
+
+def test_chat_rejects_invalid_session_id(client):
+    r = client.post("/api/chat", json={"message": "hello", "session_id": "../shared"})
     assert r.status_code == 400
 
 

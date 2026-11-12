@@ -93,7 +93,7 @@ def load_snapshot() -> list[dict]:
     return rows
 
 
-def fetch_announcements() -> tuple[list[dict], str]:
+def fetch_announcements(snapshot_anchor: datetime | None = None) -> tuple[list[dict], str]:
     """Returns (filings, mode) where mode is 'live' or 'snapshot'."""
     live = fetch_live_announcements()
     if live:
@@ -101,13 +101,17 @@ def fetch_announcements() -> tuple[list[dict], str]:
     snap = load_snapshot()
     mode = "snapshot" if snap else "none"
     log.info("Using %s announcements snapshot (%d rows)", mode, len(snap))
-    # Re-dated: shift snapshot timestamps to look recent for the digest demo.
-    return _redate(snap), mode
+    # Re-date against a persisted anchor supplied by the pipeline. Reusing the
+    # anchor makes repeated demo runs produce the same filing identities.
+    return _redate(snap, anchor=snapshot_anchor), mode
 
 
-def _redate(rows: list[dict], hours_back: int = 20) -> list[dict]:
+def _redate(rows: list[dict], hours_back: int = 20,
+            anchor: datetime | None = None) -> list[dict]:
     """Spread snapshot filings over the last `hours_back` hours so the 24h digest is populated."""
-    now = datetime.now(timezone.utc)
+    now = anchor or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
     out = []
     n = max(len(rows), 1)
     for i, r in enumerate(rows):
