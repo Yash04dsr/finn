@@ -59,6 +59,16 @@ button {
   touch-action: manipulation;
 }
 
+/* Keyboard focus ring — visible on Tab, never on mouse click (UX.md #7). */
+:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 3px;
+}
+
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
 input,
 textarea,
 select {

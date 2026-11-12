@@ -62,7 +62,9 @@ function AlertSettings() {
       await api.saveSettings(draft);
       reload();
     } catch {
-      alert("Could not save settings — is the backend running?");
+      window.dispatchEvent(new CustomEvent("finn-toast", {
+        detail: { message: "Couldn't save — connection issue. Check the backend and retry.", error: true },
+      }));
     } finally {
       setSaving(false);
     }
@@ -93,6 +95,7 @@ function AlertSettings() {
           min={1.5}
           max={5}
           step={0.1}
+          aria-label="Volume spike threshold multiplier"
           value={draft.volume_multiplier}
           onChange={(e) => setDraft({ ...draft, volume_multiplier: Number(e.target.value) })}
           className="mt-2.5"
@@ -113,6 +116,7 @@ function AlertSettings() {
           min={1}
           max={10}
           step={0.5}
+          aria-label="Price move threshold percent"
           value={draft.price_move_pct}
           onChange={(e) => setDraft({ ...draft, price_move_pct: Number(e.target.value) })}
           className="mt-2.5"
