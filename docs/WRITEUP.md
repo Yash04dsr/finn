@@ -1,53 +1,29 @@
-# Covering note (draft)
+# Covering note
 
 **To:** assessment@enam.com
 **Subject:** IIT Delhi – AI Engineer - 2027
 
----
-
 Dear ENAM team,
 
-**A brief you finish, graded against management's own words.**
+The app is https://finn-ochre-five.vercel.app. The repo is https://github.com/Yash04dsr/finn.
 
-**Who I built for.** I started from the investor in your brief: a small team making high-conviction decisions and living with the outcomes. That is a portfolio manager with 15 to 20 Indian listed companies who protects the reason they own each one. Their day has a check before the open, filings at any hour, a results season where each filing and call takes 30 to 60 minutes, and a quarterly question: did management do what they said? NSE alone publishes around a thousand announcements a day, most of them paperwork.
+A brief you finish, graded against management's own words.
 
-**What I built.** FINN is a web-first Next.js PWA (`frontend/`, deployed on Vercel and backed by a FastAPI service on Vercel) built around three steps:
+I built FINN for the investor in your brief. A small team holds 15 to 20 Indian listed companies and lives with the decision. In the morning they need to know if anything they own changed. Once a quarter they need to know if management did what they said. NSE publishes roughly 900 to 1,500 announcements a day, and most of them are paperwork. One results filing and its call take 30 to 60 minutes. FINN finishes that check in about two minutes.
 
-1. **Finish the Brief and record verdicts.** The home screen shows only the items that need a decision, one at a time, with routine filings counted rather than shown. Each item names the watchpoint it touches, recalls your past verdict on similar items, and ends with "You are done for this window" once decided. Verdicts (`No impact`, `Watch closer`, `Changes the story`) and optional one-line reasons are saved to a decision journal.
-2. **Promise Check on results alerts and Promise Ledger on company pages.** Results alerts compute Revenue, EBITDA, and PAT YoY in code and attach a deterministic **PromiseCheck** (`kept`, `missed`, `not_reported`, or `no_guidance`) comparing reported numbers against management's earlier guided band. Opening the alert (`/alert/[id]`) or the company page (`/company/[ticker]`) shows both citations side by side, the full Promise ledger, and your decision history.
-3. **Unseen NSE/BSE ticker on demand.** Ask about or open any NSE/BSE ticker FINN has never seen. It pulls live quarterly numbers, finds and indexes the newest call transcripts (or the latest annual report when a company holds no calls, such as ITC) with staged progress, and answers only from server-verified primary citations—or states plainly when no primary documents exist.
+It is a mobile-first website. The link opens on a phone. There is nothing to install.
 
-An Expo app (`mobile/`) is also kept in the repo as an additional native client speaking the same API.
+Push is the brief. You pick the window. Items that need a decision come one at a time. Each one names the watchpoint it touches and recalls your last verdict on a similar filing. Routine filings are a count. You mark No impact, Watch closer, or Changes the story, and you can add one line. When the window is decided, the screen says you are done. On a results item, revenue, EBITDA, and PAT versus last year are calculated in code. The promise check is code too. It sets the number in this filing against the band management guided on an earlier call, and it keeps both sources. It marks the promise kept or missed, and it says when the filing left the figure out or management never gave a number.
 
-Each instance still works from SQLite in `/tmp`. Verdicts, the investor's own watchpoints and settings, and documents read for a company on demand are also written to Neon Postgres (`DATABASE_URL` on the backend) and loaded when an instance starts, so a recycled function keeps a decision that was already saved.
+Pull is a question on any NSE or BSE ticker, including one FINN has never seen. It fetches the quarterly table, finds the newest call transcripts, or the latest annual report when the company holds no calls, and answers only from those pages. ITC is the case with no calls. The server drops any citation it did not read. If there is no primary document, the answer says so. A buy, sell, or hold request, and any question that is not about the company, gets one sentence. No news, and no broker notes. I read an incoming executive's background from the appointment filing. SEBI already requires a short profile there.
 
-**Key trade-offs.**
-1. *Web-first over Expo as the primary deliverable.* A Vercel URL opens immediately on any phone or desktop browser with zero install, no Expo Go tunnel drops, and one link to grade. The trade-off is that on iOS (16.4+), Web Push requires **Add to Home Screen** in Safari before notifications can be enabled.
-2. *Code decides numbers and promise checks; models read and write.* Numbers, ranking, `promise_check`, ledger grading, routing, and citation verification are deterministic Python with tests. Models handle ambiguous filing classification, guidance extraction, executive profiles, short lines, and research synthesis. An investor forgives a dry sentence, not a wrong number.
-3. *Routing in code, not by the model.* Company questions always go to the grounded research analyst, so nothing about a company is answered from model memory. Buy/sell/hold requests and off-topic questions are declined in one sentence before any model runs.
-4. *Model routing on one key.* My key allows one model (`hyde/glm-5.3-flash`), so the fast tier runs it with `reasoning_effort=low` and the reasoning tier runs full reasoning for synthesis only. Bulk jobs used 68 output tokens against 607 with the same answers. Guidance extraction is cached per document, and research answers are reused at zero tokens until a company's documents or numbers change. Every chat answer displays its tier, token count, cost (when priced), and cache state.
-5. *Executive backgrounds from the filing.* SEBI LODR requires an appointee profile in the filing itself; FINN reads it there rather than scraping LinkedIn.
+Every model call goes through Hyde, at https://inference.hyde.tech/v1. Both the fast tier and the reasoning tier are the open-weight model GLM-5.3-Flash, configured as `hyde/glm-5.3-flash`. The weights are published under the MIT license. This key allows that one model, so the tiers differ by how much it is allowed to think. Classification, guidance extraction, one-line summaries, and the executive profile run with reasoning turned down. Research synthesis uses full reasoning. On the same three bulk jobs the fast setting used 68 output tokens and full reasoning used 607, with the same answers. Guidance is extracted once per document. A research answer is reused at zero tokens until that company's documents or numbers change. Each chat answer shows its tier, token count, and cost when a price is set. Numbers, ranking, and the promise grade stay in code.
 
-**Deliberately cut.**
-- *Pre-results prep card*: useful before earnings, but a second new workflow dilutes the core brief + promise check loop; listed as next.
-- *Buy/sell/hold calls, news, broker notes, multi-user accounts, and intraday prices*: out of scope for a concentrated, primary-source monitoring workflow.
-- *Expo feature parity*: `mobile/` remains frozen and working in the repo while `frontend/` carries the primary web-first experience.
+I made the website the thing to grade. The Expo app is still in the repo and talks to the same API. One link works on a phone and a laptop. On iOS 16.4 and later, a notification needs Add to Home Screen in Safari before it can be delivered. The API runs on Vercel as a serverless function, so the SQLite file on the instance does not last. Verdicts, the investor's own watchpoints and settings, and documents read on demand are stored in Neon and loaded when a new instance starts.
 
-**Where I would take it next.** A pre-results prep card ahead of scheduled earnings, a stronger second model for the reasoning tier measured on quality per rupee, and a weekly portfolio-wide "promises kept" review.
+I cut a pre-results prep card, buy and sell calls, news, broker notes, accounts for more than one person, and intraday prices. Next I would add the prep card before earnings, try a second Hyde model on the reasoning tier and measure quality against cost, and show promises kept across the book once a week.
 
-**Trying it.** Open the Vercel link on desktop or phone (note: a cold Render free-tier backend can take ~30–50s on the first request). Use **Settings → Load the sample day** if the brief is empty, or follow the three-step walkthrough in `docs/demo-script.md`. `backend/evals/results/latest.json` holds the latest end-to-end eval run (7 of 7).
+If the brief is empty, open Settings and load the sample day. It is labelled, and it is not live filings. The build history is in the repo at `docs/ai-build-history.md`.
 
-Links: [Web app (Vercel)](https://finn-ochre-five.vercel.app) · [Backend health](https://finn-backend-flax.vercel.app/healthz) · [GitHub repo](https://github.com/Yash04dsr/finn) · [AI build history](https://github.com/Yash04dsr/finn/blob/main/docs/ai-build-history.md)
-
-Name
-IIT Delhi – 2027
-
----
-
-## Checklist before sending
-
-- [x] Vercel backend health (`GET /healthz` → `research_ready: true`) and Neon for saved verdicts (`durable_state: true`)
-- [ ] Vercel web URL opens on phone (mobile data) and desktop in a private window
-- [x] GitHub repo: https://github.com/Yash04dsr/finn
-- [ ] AI build history exported (Cursor chats)
-- [ ] Subject line copied exactly from the brief
+Yash Sakhare
+IIT Delhi, 2027
