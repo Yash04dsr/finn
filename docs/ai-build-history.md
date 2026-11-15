@@ -1,3 +1,6 @@
+The actual transcripts are in docs/ai-build-history/.
+This file is the earlier note, not the chat log.
+
 # AI build history — how FINN was built
 
 This project was built **with** AI coding agents, and the conversation exports are part

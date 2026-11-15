@@ -23,7 +23,7 @@ I made the website the thing to grade. The Expo app is still in the repo and tal
 
 I cut a pre-results prep card, buy and sell calls, news, broker notes, accounts for more than one person, and intraday prices. Next I would add the prep card before earnings, try a second Hyde model on the reasoning tier and measure quality against cost, and show promises kept across the book once a week.
 
-If the brief is empty, open Settings and load the sample day. It is labelled, and it is not live filings. The build history is in the repo at `docs/ai-build-history.md`.
+If the brief is empty, open Settings and load the sample day. It is labelled, and it is not live filings. The build history is in the repo at `docs/ai-build-history/`.
 
 Yash Sakhare
 IIT Delhi, 2027
