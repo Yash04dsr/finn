@@ -3,7 +3,7 @@ services:
     name: finn-backend
     runtime: python
     rootDir: backend
-    buildCommand: "pip install uv && uv sync --frozen && uv run python -m finn.ingest.official_docs"
+    buildCommand: "pip install uv && uv sync --frozen && uv run python build_db.py"
     startCommand: "uv run uvicorn finn.api.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /healthz
     envVars:
@@ -14,6 +14,10 @@ services:
       - key: FINN_MODEL_REASONING
         value: hyde/glm-5.3-flash
       - key: FINN_ALLOWED_ORIGINS
+        sync: false
+      - key: FINN_VAPID_PUBLIC_KEY
+        sync: false
+      - key: FINN_VAPID_PRIVATE_KEY
         sync: false
       - key: FINN_CHAT_RATE_PER_MINUTE
         value: "20"

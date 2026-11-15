@@ -1,0 +1,16 @@
+name: Daily backend rebuild
+
+# The backend bakes the sample day into its bundled DB at build time; rebuilding daily
+# keeps it inside the brief's 24-hour window.
+on:
+  schedule:
+    - cron: "0 19 * * *"
+  workflow_dispatch:
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS -X POST "$HOOK" > /dev/null
+        env:
+          HOOK: ${{ secrets.VERCEL_BACKEND_DEPLOY_HOOK }}

@@ -11,18 +11,18 @@ Live: web app https://finn-ochre-five.vercel.app · backend https://finn-backend
 Project `finn-backend`, Root Directory `backend`, function region `bom1` (Mumbai: close to BSE and the model gateway).
 
 1. Config lives in `backend/vercel.json` (FastAPI preset, `maxDuration` 300) and `backend/pyproject.toml` (`[tool.vercel]` entrypoint and build script).
-2. The build runs `backend/vercel_build.py`: it downloads the issuer-hosted corpus and grades the sample-day results calls into `data/finn.db`, which ships in the read-only bundle. Each instance copies it to `FINN_DB_PATH` on cold start.
-3. Env vars: `HYDE_API_KEY`, `HYDE_BASE_URL`, `FINN_MODEL_FAST`, `FINN_MODEL_REASONING`, `FINN_ALLOWED_ORIGINS`, `FINN_DB_PATH=/tmp/finn.db`, `FINN_PDF_DIR=/tmp/finn-docs`, `XDG_CACHE_HOME=/tmp/.cache`, `FINN_VAPID_PUBLIC_KEY`, `FINN_VAPID_PRIVATE_KEY` (fixed keys so push subscriptions survive cold starts).
-4. State in `/tmp` is per instance: verdicts and the loaded sample day reset when an instance is recycled. The scheduler is off on Vercel (`VERCEL=1`); use **Settings → Load the sample day** or `POST /api/demo/run`.
+2. The build runs `backend/build_db.py`: it downloads the issuer-hosted corpus, grades the sample-day results calls and loads the sample day into `data/finn.db`, which ships in the read-only bundle. Each instance copies it to `FINN_DB_PATH` on cold start, so every instance serves the same brief. `.github/workflows/daily-backend-rebuild.yml` calls a Vercel deploy hook (repo secret `VERCEL_BACKEND_DEPLOY_HOOK`) daily so the sample day stays inside the 24-hour window.
+3. Env vars: `HYDE_API_KEY`, `HYDE_BASE_URL`, `FINN_MODEL_FAST`, `FINN_MODEL_REASONING`, `FINN_ALLOWED_ORIGINS`, `FINN_DB_PATH=/tmp/finn.db`, `FINN_PDF_DIR=/tmp/finn-docs`, `XDG_CACHE_HOME=/tmp/.cache`, `FINN_VAPID_PUBLIC_KEY`, `FINN_VAPID_PRIVATE_KEY` (fixed keys so push subscriptions survive cold starts), `FINN_WARM_LEDGER=0` (ledgers are graded at build time).
+4. State written at runtime lives in `/tmp` per instance: verdicts, push subscriptions and on-demand coverage of new tickers are not shared between instances and reset when one is recycled. The scheduler is off on Vercel (`VERCEL=1`). For a single persistent process, use the Render blueprint below.
 5. Redeploy: push to `main` (Git-connected), or `cd backend && npx vercel@latest deploy --prod`.
 
 ## Backend alternative (Render free tier — or Railway/Fly equivalently)
 
 1. Push this repo to GitHub.
 2. Render → New → Blueprint → point at the repo (uses `backend/render.yaml`).
-3. Set `HYDE_API_KEY` and `FINN_ALLOWED_ORIGINS` (include your Vercel URL) in the dashboard.
+3. Set `HYDE_API_KEY`, `FINN_ALLOWED_ORIGINS` (include your Vercel URL) and the two `FINN_VAPID_*` keys in the dashboard, then point the frontend's `FINN_BACKEND_URL` at the Render URL.
    - Optional: set `FINN_PRICE_FAST_IN`, `FINN_PRICE_FAST_OUT`, `FINN_PRICE_REASONING_IN`, `FINN_PRICE_REASONING_OUT` (USD per 1M tokens) if you want per-answer cost shown in chat.
-4. The build ingests issuer-hosted Persistent/Crompton PDFs. After first boot, hit `POST /api/demo/run` once (or use **Settings → Load the sample day** in the app) to populate the feed.
+4. The build runs `build_db.py` (corpus, ledgers, sample day). To refresh the sample day later, hit `POST /api/demo/run` once (or use **Settings → Load the sample day** in the app) to populate the feed.
    - The SQLite DB is ephemeral on the free tier; startup restores the verified research corpus and the demo pipeline is idempotent.
 5. Verify: `curl https://<backend-url>/healthz` → `research_ready: true`.
 

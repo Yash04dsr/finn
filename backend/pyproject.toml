@@ -42,4 +42,4 @@ package = false
 entrypoint = "finn.api.main:app"
 
 [tool.vercel.scripts]
-build = "env FINN_DB_PATH=data/finn.db python vercel_build.py"
+build = "env FINN_DB_PATH=data/finn.db python build_db.py"
