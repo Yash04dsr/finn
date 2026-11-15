@@ -73,6 +73,13 @@ async def lifespan(_app: FastAPI):
     scheduler_enabled = os.getenv("VERCEL") != "1"
     if scheduler_enabled:
         start_scheduler()
+    if os.getenv("FINN_SAMPLE_ON_START") == "1" and os.getenv("FINN_TEST_DB") != "1":
+        # Serverless instances start from the bundled DB; re-anchor its sample day (about 1s,
+        # no model calls) so a fresh instance never serves an empty or stale brief.
+        try:
+            await run_pipeline(sample=True, push=False)
+        except Exception:
+            log.exception("sample day re-anchor failed")
     if os.getenv("FINN_TEST_DB") != "1" and os.getenv("FINN_WARM_LEDGER", "1") == "1":
         asyncio.get_running_loop().create_task(_warm_sample_ledgers())
     try:
