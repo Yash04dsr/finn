@@ -1,154 +1,127 @@
-# FINN — Architecture
+# FINN architecture
 
 ## The system at a glance
 
 ```mermaid
 flowchart LR
-    subgraph ingest [Ingestion - Python]
-        nse[NSE announcements<br/>live scrape + snapshot fallback]
-        yf[yfinance EOD<br/>prices + volume]
-        scr[Screener.in<br/>quarterly numbers]
-        docs[AR / transcript PDFs<br/>chunked]
+    subgraph sources [Sources]
+        nse[NSE announcements]
+        yf[yfinance EOD prices]
+        scr[Screener.in quarterly table and document list]
+        pdf[Transcripts, presentations, annual reports on BSE and issuer sites]
     end
 
-    subgraph store [SQLite - WAL + FTS5]
-        db1[(filings)]
-        db2[(chunks_fts)]
-        db3[(prices)]
-        db4[(quarterly)]
-        db5[(alerts / digests)]
-        db6[(cost_ledger)]
-        db7[(settings)]
+    subgraph push [Push: deterministic core]
+        cls[Classifier: keywords first, one batched fast call]
+        rank[Ranking engine: category, headline wording, investor settings]
+        enr[Enrichers: results first cut in code, executive profile from the filing]
+        brief[Brief: decide, worth a look, background, routine count]
     end
 
-    subgraph push [Push pipeline - deterministic core]
-        cls[Hybrid classifier<br/>regex first, LLM for ambiguous]
-        thr[Threshold engine<br/>user-configurable]
-        enr[Enrichers<br/>results first-cut + exec bio]
-        dgc[Digest composer<br/>rank + collapse noise]
-        wp[Expo push /<br/>web-push + inbox]
+    subgraph pull [Pull]
+        route[Router in code]
+        ra[Research analyst: reasoning tier]
+        asst[Portfolio assistant: fast tier]
+        ledger[Promise ledger: fast extraction, graded in code]
+        cite[Citation check and answer cache]
     end
 
-    subgraph pull [Pull side - Google ADK v2.14]
-        root[finn root LlmAgent<br/>routes, fast tier]
-        ra[research_analyst<br/>grounded, reasoning tier]
-        rag[search_docs tool<br/>FTS5 + citations]
-        met[quarterly_metrics tool<br/>stored math]
-        pcx[price_context tool]
-    end
+    store[(SQLite: filings, alerts, verdicts, watchpoints, chunks with FTS5, quarterly, guidance claims, answer cache, usage ledger)]
 
-    subgraph client [Clients]
-        expo[Expo app<br/>iOS/Android]
-        pwa[Next.js PWA<br/>fallback web]
-    end
-
-    api[FastAPI<br/>SSE chat + REST]
-
-    nse --> db1
-    yf --> db3
-    scr --> db4
-    docs --> db2
-    db1 --> cls
-    db3 --> thr
-    cls --> enr
-    thr --> enr
-    enr --> dgc --> wp
-    db1 --> rag
-    db2 --> rag
-    db4 --> met
-    db3 --> pcx
-    root --> ra
-    ra --> rag
-    ra --> met
-    ra --> pcx
-    api --> root
-    api --> db5
-    api --> db7
-    expo <--> api
-    pwa <--> api
+    nse --> cls --> rank --> enr --> store
+    yf --> rank
+    scr --> store
+    pdf --> store
+    store --> brief
+    route --> ra
+    route --> asst
+    ra --> ledger
+    ra --> cite
+    store --> ra
+    brief --> expo[Expo app]
+    cite --> expo
+    brief --> web[Next.js web app]
 ```
 
-## Design principles (and why)
+## Push: the brief
 
-### 1. The LLM never does math
-Every number shown — QoQ/YoY deltas, margins, volume ratios — is computed in pure
-Python from stored data (`finn/tools/metrics.py`, `finn/alerts/engine.py`). The model
-narrates; it never calculates. This kills a whole class of confident-wrong-number
-failures, and it makes the deterministic tests (`tests/test_metrics.py`,
-`tests/test_engine.py`) meaningful: if the threshold math is wrong, a test fails —
-no probabilistic excuses.
+1. **Ingest.** `pipeline.run_pipeline` fetches NSE announcements for the watched tickers. That means the portfolio plus anything the investor added with Watch on a company page.
+   - Times are read as India time.
+   - A quiet live day returns nothing. An outage returns nothing too and is logged as an outage. The labelled sample day is loaded only when asked for, through Settings or `POST /api/demo/run`.
+2. **Classify.** Keywords cover most of the taxonomy at zero model tokens. The ambiguous remainder goes to the fast tier in one batched call.
+3. **Rank.** `alerts/engine.announcement_priority` combines a base tier per category with headline wording, then applies the investor's category watchlist: unwatched categories drop a tier. The rules include:
+   - reaffirmed ratings, commercial paper, pledge releases and meeting intimations rank lower
+   - order wins and buybacks rank higher
+   - ESOP allotments, compliance certificates and shareholding patterns are routine
 
-### 2. Keywords first, LLM only for ambiguity
-The bundled demo classifies most filings with regex over the 17-category taxonomy at
-zero model-token usage.
-Ambiguous ones go to the fast tier **in one batched call** (one request for all
-pending items, not one per filing). This is the "smart model routing" instinct the
-brief asks for, applied at the pipeline level.
+   Every stored alert is re-ranked when settings change. Each alert carries a plain reason ("Read now: a leadership change. It is in a category you asked to watch.").
+4. **Enrich, material items only.**
+   - Results: a deterministic first cut (Revenue, EBITDA, PBT, PAT, QoQ, YoY).
+   - Management change: the incoming person's profile, read from the filing attachment, which must contain a brief profile under SEBI LODR. The annual report is the fallback. A background is accepted only if its supporting quote appears in the document.
+   - Other material categories: a one-line summary that must pass a sentence check, or the headline.
+5. **Store.** Alerts have a stable identity. Reruns refresh the event time rather than inserting copies, and keep the read state and any verdict.
+6. **Brief.** `brief.brief(hours)` splits the window into items to decide (priority 1), worth a look (priority 2), background (priority 3) and a routine count. Each item carries:
+   - the watchpoint it touches
+   - whether it is new since the last look
+   - the investor's last verdict on a similar item
+7. **Push.** The single most important new item is sent through Expo push. It deep-links to `/alert/{id}`, and the body carries the first-cut numbers.
 
-### 3. Grounded-or-refuse on the Pull side
-The ResearchAnalyst's system contract (see
-`backend/finn/agents/research_analyst.py`) forbids outside knowledge: tools return a
-`status: "no_results"` payload that *tells the model to say so*, and the eval suite
-(`backend/evals/`) asserts both behaviours — citing `[S#]` for grounded claims and
-explicit refusal outside the corpus. Every tool result carries doc_title + period +
-URL so citations resolve to real documents.
+## Pull: routing, research, and citations
 
-### 4. "Unusual" belongs to the user
-The threshold engine reads its parameters from the settings table, edited live in the
-client (volume multiplier, price-move %, category watchlist, quiet hours). The engine
-also emits a `why` string per alert — "Why am I seeing this?" is a first-class UI
-disclosure, not a debug field.
+- **Routing in code** (`llm/intent.py`). A question that names a company (by symbol or common name), carries a ticker, or follows up on one goes to the research analyst. Portfolio-wide questions go to the fast assistant, which has only prices and the alert feed. The assistant cannot answer company analysis from memory because it never receives those questions.
+- **Guards before any model** (`llm/chat_guard.py`). Off-topic questions and prompt-injection attempts get a one-sentence refusal. Buy, sell, or hold questions get a plain explanation of what FINN does instead.
+- **Research analyst** (Google ADK `LlmAgent`, reasoning tier). Its tools are passage search (FTS5 with BM25), reported quarterly numbers, price context, a document overview, and the Promise ledger. Every tool result carries `source_id`s.
+- **Citation check** (`llm/citations.py`). The server records every source a tool returned during the turn. Citations whose IDs were not returned are removed, the rest are renumbered `[1]`, `[2]`, and the client receives structured source records (title, period, URL, excerpt). A research answer with no valid citation is held back, unless it is the honest "not covered" reply.
+- **Clean replies** (`llm/answer.py`). The thinking model sometimes writes its working into the reply. If the analyst does not return a tagged answer, the fast tier rewrites its notes into a short reply, keeping the citation markers. Citations are validated after that rewrite.
+- **Answer cache.** A standalone company question is cached under the ticker, the normalised question, and a corpus version (chunk count, latest chunk ID, latest quarter). It is reused at 0 tokens until new documents or numbers arrive.
 
-### 5. Noise is counted, not shown
-The digest composer ranks by (priority, recency), surfaces the top 12, and reports
-routine paperwork as a number ("6 routine collapsed") — surfacing *that it was
-filtered* is the trust mechanism; hiding silently is how apps lose investors.
+## Any ticker
 
-### 6. Usage as a product surface
-Direct LiteLLM calls and ADK model events log provider-reported prompt/completion tokens
-to `cost_ledger` with an explicit routing tier. Settings renders the fast/reasoning
-split as usage telemetry. FINN does not claim monetary cost without a provider pricing
-table and cache/billing metadata.
+`ingest/discovery.py` reads the company's Screener page:
+- quarterly numbers, including depreciation, so EBIT margin can be checked
+- the list of earnings calls with transcript and presentation links
+- annual reports
+
+Each call month maps to the quarter it discusses (an October 2026 call discusses Q2 FY27). The newest transcripts and the latest presentation are downloaded from BSE or the issuer and indexed, within a time budget. A company that holds no calls gets its latest annual report instead.
+
+- The company page triggers this in the background and shows progress.
+- A chat question about an unseen company triggers it inline before answering.
+
+Live quarterly numbers replace any illustrative rows, so the two never mix in one series.
+
+## The Promise ledger
+
+`tools/ledger.py`.
+
+**Extraction**, once per transcript and extractor version:
+- Passages with guidance language and numbers are sent to the fast tier, which returns commitments.
+- A commitment is kept only if the first words of its quote appear in the cited passage. Analyst questions are rejected.
+
+**Grading**, in code:
+- Revenue growth, EBITDA margin, EBIT margin and net margin are compared with the latest reported quarter after the call: kept or missed.
+- A different band for the same metric and unit on a later call marks the earlier one revised.
+- A metric with no number on later calls is gone quiet.
+- Promises for the current quarter are too early.
+- Absolute targets (revenue of $5 billion by FY31) are listed as stated targets to track.
+
+Watchpoints are drafted from checkable promises the first time a company's ledger is built, and the investor can edit them.
 
 ## Model routing
 
-| Tier | Default model | Used for |
+| Tier | Model and setting | Jobs |
 |---|---|---|
-| Fast | `hyde/glm-5.3-flash` | classification (batched), digest one-liners, exec-bio extraction, root-agent chat |
-| Reasoning | `FINN_MODEL_REASONING` env (swap without code changes) | ResearchAnalyst synthesis: narrative-vs-numbers, bull/bear |
+| Fast | `hyde/glm-5.3-flash`, `reasoning_effort=low` | ambiguous classification, guidance extraction, executive profiles, one-liners, portfolio assistant, final answer writing |
+| Reasoning | `hyde/glm-5.3-flash`, full reasoning | research synthesis |
+| Code | none | numbers, ranking, grading, routing, citation checks |
 
-The Hyde gateway exposes one permitted model today, so both tiers resolve to the same
-model by default; the separation is kept in config + ledger so a stronger reasoning
-model (e.g. kimi-k3 when the key allows, Gemini, GPT) drops in via env var. Tiering
-was validated end-to-end earlier in the build with a real second model.
+The gateway key permits one model, so the tiers differ by reasoning budget. On the same three bulk jobs the fast tier used 68 output tokens against 607 at full reasoning, with the same answers (`evals/routing_bench.py`). Changing either tier's model is one environment variable. Every call is logged with scope, tier, and tokens (`cost_ledger`), and each answer card shows its tier and token count.
 
-## Data sources & fallbacks
+## Data provenance
 
-- **NSE announcements**: live scrape first (session-warmed public API); a bundled
-  snapshot of 39 realistic filings re-dated at load time so the demo is deterministic
-  and never dies on a blocked IP.
-- **Prices**: yfinance `.NS` with `.BO` fallback, 60 days, stored per EOD bar.
-- **Quarterly numbers**: Screener.in scrape first; bundled 7-quarter snapshot for 7
-  demo companies.
-- **Documents**: issuer-hosted Persistent and Crompton PDFs (official annual reports,
-  earnings transcripts and results presentations), ingested with pypdf using
-  paragraph-aware overlap and repeated-header stripping. `official_docs.py` records the
-  exact URLs; `docs.py` is the generic ingestion seam for another ticker.
-
-## ADK specifics (v2.14)
-
-- Root `LlmAgent(name="finn")` with two sub-agents; delegation is ADK's native
-  `transfer_to_agent` flow (visible in the UI as a tool chip).
-- `LiteLlm` wrapper routes to any OpenAI-compatible gateway; env-var credentials set
-  once in `llm/routing.ensure_llm_env()`.
-- `DatabaseSessionService` on `sqlite+aiosqlite` persists conversations across app
-  restarts; `InMemorySessionService` in evals.
-- The chat endpoint streams `Runner.run_async` events over SSE; `is_final_response()`
-  separates reasoning-preamble frames (rendered as dim "process" text) from the final
-  answer — the thinking-model behavior is turned into visible agent process.
+- Every number in the app is labelled: Screener quarterly table (compiled from exchange filings), the company's results presentation, or sample-day numbers for the demo.
+- Sample-day alerts are flagged `is_sample` and shown with a label.
+- Bios show their source and open the filing when one exists.
 
 ## Scheduling
 
-APScheduler cron `18:30 IST Mon–Fri` runs one `run_pipeline()` pass: ingest → classify
-→ enrich → thresholds → digest → push. The same function is exposed as `POST
-/api/demo/run` so graders trigger a full cycle on demand instead of waiting for 18:30.
+APScheduler runs the live pipeline at 18:30 IST, Monday to Friday. `POST /api/demo/run` loads the sample day on demand.

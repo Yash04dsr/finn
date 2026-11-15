@@ -97,8 +97,8 @@ export function RevenueChart({ quarterly, height = 168 }: RevenueChartProps) {
               y={y}
               width={barW}
               height={Math.max(2, h)}
-              rx={3}
-              fill={isLast ? colors.accent : 'rgba(16,185,129,0.30)'}
+              rx={0}
+              fill={isLast ? colors.accent : 'rgba(0,0,0,0.18)'}
             />
           );
         })}
@@ -119,7 +119,7 @@ export function RevenueChart({ quarterly, height = 168 }: RevenueChartProps) {
             width={4}
             height={4}
             rx={2}
-            fill={i === lastIdx ? colors.amber : 'rgba(245,158,11,0.7)'}
+            fill={i === lastIdx ? colors.amber : 'rgba(179,139,109,0.85)'}
           />
         ))}
         {/* value label above last bar */}
@@ -150,11 +150,11 @@ export function RevenueChart({ quarterly, height = 168 }: RevenueChartProps) {
       {/* legend */}
       <View style={{ flexDirection: 'row', marginTop: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 14 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: colors.accent, marginRight: 6 }} />
+          <View style={{ width: 16, height: 3, backgroundColor: '#000000', marginRight: 6 }} />
           <Text style={type.micro}>Revenue (₹ Cr)</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 14, height: 2, borderRadius: 1, backgroundColor: colors.amber, marginRight: 6 }} />
+          <View style={{ width: 16, height: 3, backgroundColor: colors.tan, marginRight: 6 }} />
           <Text style={type.micro}>EBITDA margin %</Text>
         </View>
       </View>

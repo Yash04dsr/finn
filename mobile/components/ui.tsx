@@ -15,14 +15,22 @@ export function CategoryChip({ label, small }: { label: string; small?: boolean 
     <View
       style={{
         paddingHorizontal: small ? 7 : 9,
-        paddingVertical: small ? 2.5 : 4,
-        borderRadius: 999,
+        paddingVertical: small ? 3 : 4,
+        borderRadius: 0,
         borderWidth: 1,
         borderColor: colors.borderStrong,
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        backgroundColor: '#FFFFFF',
       }}
     >
-      <Text style={{ fontSize: small ? 10.5 : 11.5, color: colors.muted, fontWeight: '600', letterSpacing: 0.2 }}>
+      <Text
+        style={{
+          fontSize: small ? 10 : 10.5,
+          color: colors.text,
+          fontWeight: '600',
+          letterSpacing: 0.9,
+          textTransform: 'uppercase',
+        }}
+      >
         {catLabel(label)}
       </Text>
     </View>
@@ -33,13 +41,13 @@ export function ChangeBadge({ pct, small }: { pct: number | null; small?: boolea
   const v = pct ?? 0;
   const pos = v > 0;
   const flat = Math.abs(v) < 0.005;
-  const bg = flat ? 'rgba(255,255,255,0.06)' : pos ? colors.accentDim : colors.redDim;
-  const fg = flat ? colors.muted : pos ? colors.accent : colors.red;
+  const bg = flat ? 'rgba(0,0,0,0.04)' : pos ? 'rgba(30,107,79,0.10)' : colors.redDim;
+  const fg = flat ? colors.muted : pos ? colors.pos : colors.neg;
   return (
     <View
       style={{
         backgroundColor: bg,
-        borderRadius: 7,
+        borderRadius: 0,
         paddingHorizontal: small ? 6 : 8,
         paddingVertical: 3,
         flexDirection: 'row',
@@ -58,24 +66,19 @@ export function ChangeBadge({ pct, small }: { pct: number | null; small?: boolea
   );
 }
 
-export function TickerBadge({ ticker, size }: { ticker: string; size?: number }) {
-  const s = size ?? 34;
+export function TickerBadge({ ticker }: { ticker: string; size?: number }) {
   return (
     <View
       style={{
-        width: s,
-        height: s,
-        borderRadius: s / 2 - 2,
-        backgroundColor: colors.surface2,
+        backgroundColor: '#000000',
         borderWidth: 1,
-        borderColor: colors.border,
-        alignItems: 'center',
-        justifyContent: 'center',
+        borderColor: '#000000',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
       }}
     >
-      <Text style={{ color: colors.text, fontWeight: '700', fontSize: s * 0.3, letterSpacing: 0.3 }}>
-        {ticker.slice(0, 2)}
-        {ticker.length > 2 ? '' : ''}
+      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 11, letterSpacing: 0.6 }}>
+        {ticker}
       </Text>
     </View>
   );
@@ -87,13 +90,13 @@ export function PctChip({ label, value }: { label: string; value: number | null 
   return (
     <View
       style={{
-        backgroundColor: pos ? colors.accentDim : colors.redDim,
-        borderRadius: 6,
+        backgroundColor: pos ? 'rgba(30,107,79,0.10)' : colors.redDim,
+        borderRadius: 0,
         paddingHorizontal: 6,
         paddingVertical: 2,
       }}
     >
-      <Text style={{ fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'], color: pos ? colors.accent : colors.red }}>
+      <Text style={{ fontSize: 11, fontWeight: '700', fontVariant: ['tabular-nums'], color: pos ? colors.pos : colors.neg }}>
         {label} {(v > 0 ? '+' : '') + v.toFixed(1) + '%'}
       </Text>
     </View>
@@ -159,8 +162,8 @@ export function ListSkeleton({ rows = 6, rowH = 76 }: { rows?: number; rowH?: nu
 
 export function SectionHeader({ title, hint }: { title: string; hint?: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
-      <Text style={[type.h3, { letterSpacing: 0.1 }]}>{title}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+      <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 1.4, textTransform: 'uppercase', color: colors.muted }}>{title}</Text>
       {hint ? <Text style={type.micro}>{hint}</Text> : null}
     </View>
   );
@@ -176,6 +179,8 @@ export function ErrorCard({ message, hint }: { message: string; hint?: string })
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.border,
+        borderTopWidth: 2,
+        borderTopColor: '#000000',
         padding: 16,
       }}
     >
@@ -194,6 +199,8 @@ export function EmptyCard({ title, body }: { title: string; body?: string }) {
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.border,
+        borderTopWidth: 2,
+        borderTopColor: '#000000',
         padding: 20,
         alignItems: 'center',
       }}
@@ -208,61 +215,43 @@ export function EmptyCard({ title, body }: { title: string; body?: string }) {
 
 type IconProps = { size?: number; color?: string; focused?: boolean };
 
-export function FeedIcon({ size = 22, color, focused }: IconProps) {
-  const c = color ?? (focused ? colors.accent : colors.muted);
+function TabGlyph({ size = 22, color, focused, d }: IconProps & { d: string }) {
+  const c = color ?? (focused ? '#000000' : '#808080');
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x="3" y="4" width="18" height="5" rx="2" fill={c} opacity={focused ? 1 : 0.55} />
-      <Rect x="3" y="11.5" width="12" height="3.4" rx="1.7" fill={c} opacity={focused ? 0.85 : 0.4} />
-      <Rect x="3" y="17.4" width="8" height="3.4" rx="1.7" fill={c} opacity={focused ? 0.65 : 0.3} />
-      <Circle cx="18.2" cy="16.9" r="3.1" stroke={c} strokeWidth="1.8" opacity={focused ? 1 : 0.5} />
-      <Path d="M18.2 18.7l1.8 1.8" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity={focused ? 1 : 0.5} />
+      <Path d={d} stroke={c} strokeWidth={focused ? 2 : 1.5} strokeLinecap="square" strokeLinejoin="miter" />
     </Svg>
   );
 }
 
-export function ChatIcon({ size = 22, color, focused }: IconProps) {
-  const c = color ?? (focused ? colors.accent : colors.muted);
+export function FeedIcon(props: IconProps) {
+  return <TabGlyph {...props} d="M3 11.25 12 3.75l9 7.5M5.25 10.5V20.25H10.5v-6h3v6h5.25V10.5" />;
+}
+
+export function ChatIcon(props: IconProps) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M4 6.5A3.5 3.5 0 0 1 7.5 3h9A3.5 3.5 0 0 1 20 6.5v6a3.5 3.5 0 0 1-3.5 3.5H10l-4.2 3.4c-.7.55-1.8.07-1.8-.86V6.5Z"
-        stroke={c}
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-        fill={focused ? 'rgba(16,185,129,0.18)' : 'none'}
-      />
-      <Circle cx="9" cy="9.6" r="1.05" fill={c} />
-      <Circle cx="12" cy="9.6" r="1.05" fill={c} />
-      <Circle cx="15" cy="9.6" r="1.05" fill={c} />
-    </Svg>
+    <TabGlyph
+      {...props}
+      d="M4.5 5.25h15a.75.75 0 0 1 .75.75v9a.75.75 0 0 1-.75.75H12l-4.5 3.75V15.75H4.5a.75.75 0 0 1-.75-.75V6a.75.75 0 0 1 .75-.75Z"
+    />
   );
 }
 
-export function CompaniesIcon({ size = 22, color, focused }: IconProps) {
-  const c = color ?? (focused ? colors.accent : colors.muted);
+export function CompaniesIcon(props: IconProps) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x="4" y="10" width="3.6" height="9" rx="1" fill={c} opacity={focused ? 1 : 0.55} />
-      <Rect x="10.2" y="6.5" width="3.6" height="12.5" rx="1" fill={c} opacity={focused ? 0.85 : 0.4} />
-      <Rect x="16.4" y="3.5" width="3.6" height="15.5" rx="1" fill={c} opacity={focused ? 1 : 0.55} />
-      <Path d="M4.5 7.5 10 4.2l4 2.6 5.5-3.4" stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity={focused ? 0.9 : 0.45} />
-    </Svg>
+    <TabGlyph
+      {...props}
+      d="M4.5 20.25V6.75a1.5 1.5 0 0 1 1.5-1.5h6a1.5 1.5 0 0 1 1.5 1.5v13.5M13.5 10.5h4.5a1.5 1.5 0 0 1 1.5 1.5v8.25M3 20.25h18M7.5 9h1.5M7.5 12.75H9M7.5 16.5H9"
+    />
   );
 }
 
-export function SettingsIcon({ size = 22, color, focused }: IconProps) {
-  const c = color ?? (focused ? colors.accent : colors.muted);
+export function SettingsIcon(props: IconProps) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="12" r="3" stroke={c} strokeWidth="1.8" />
-      <Path
-        d="M12 2.8v2.4M12 18.8v2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.8 12h2.4M18.8 12h2.4M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"
-        stroke={c}
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </Svg>
+    <TabGlyph
+      {...props}
+      d="M10.34 3.94a1.5 1.5 0 0 1 2.32 0l.9 1.1c.32.4.83.58 1.32.47l1.4-.31a1.5 1.5 0 0 1 1.64.68l.1.18a1.5 1.5 0 0 1-.1 1.72l-.87 1.1a1.5 1.5 0 0 0-.3 1.08l.13 1.43a1.5 1.5 0 0 1-.87 1.5l-.17.08a1.5 1.5 0 0 1-1.7-.32l-.98-1a1.5 1.5 0 0 0-2.12 0l-.98 1a1.5 1.5 0 0 1-1.7.32l-.17-.08a1.5 1.5 0 0 1-.87-1.5l.13-1.43a1.5 1.5 0 0 0-.3-1.08l-.87-1.1a1.5 1.5 0 0 1-.1-1.72l.1-.18a1.5 1.5 0 0 1 1.64-.68l1.4.31c.49.11 1-.07 1.32-.47l.9-1.1ZM12 15.75V21"
+    />
   );
 }
 
@@ -274,7 +263,7 @@ export function ChevronRight({ size = 14, color = colors.faint }: { size?: numbe
   );
 }
 
-export function SendIcon({ size = 18, color = '#04130C' }: { size?: number; color?: string }) {
+export function SendIcon({ size = 18, color = '#FFFFFF' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M3.5 11.2 20 4l-4.6 16.5-4.3-6.2-7.6-3.1Z" stroke={color} strokeWidth="1.9" strokeLinejoin="round" fill={color} fillOpacity={0.15} />
@@ -283,7 +272,7 @@ export function SendIcon({ size = 18, color = '#04130C' }: { size?: number; colo
   );
 }
 
-export function StopIcon({ size = 16, color = '#04130C' }: { size?: number; color?: string }) {
+export function StopIcon({ size = 16, color = '#FFFFFF' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Rect x="6" y="6" width="12" height="12" rx="2.5" fill={color} />

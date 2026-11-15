@@ -1,47 +1,47 @@
 "use client";
 
-import { api } from "@/lib/api";
-import type { CostsResponse } from "@/lib/types";
-import { compactNum } from "@/lib/format";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 
-/** Sticky FINN wordmark + live token-cost chip. Swiss: black rule, square chip. */
-export default function Header() {
-  const [costs, setCosts] = useState<CostsResponse | null>(null);
-
-  useEffect(() => {
-    const ctrl = new AbortController();
-    api
-      .costs(ctrl.signal)
-      .then(setCosts)
-      .catch(() => {
-        /* chip simply stays hidden when backend is down */
-      });
-    return () => ctrl.abort();
-  }, []);
-
-  const tokens = costs?.total_tokens;
-
+/**
+ * Sticky top bar. Top-level screens show the FINN wordmark; detail screens show
+ * a back control instead. `right` holds at most one quiet control or fact.
+ */
+export default function Header({
+  title,
+  back,
+  right,
+}: {
+  title?: string;
+  back?: { href: string; label: string };
+  right?: ReactNode;
+}) {
+  const router = useRouter();
   return (
     <header
-      className="sticky top-0 z-40 border-b border-black bg-white"
-      style={{ paddingTop: "max(env(safe-area-inset-top), 8px)" }}
+      className="sticky top-0 z-30 border-b border-black bg-white"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="flex items-center justify-between px-4 pb-2.5 pt-1">
-        <div className="flex items-baseline gap-2 select-none">
-          <span className="display text-[22px] text-black">FINN</span>
-          <span className="hidden text-[9px] uppercase tracking-[0.14em] text-[#4B5563] sm:inline">
-            Investment Intelligence
-          </span>
-        </div>
-        {typeof tokens === "number" && tokens > 0 && (
-          <span
-            className="num border border-black/20 px-2 py-0.5 text-[11px] font-medium text-[#4B5563]"
-            title="Total tokens spent by FINN across all scopes"
+      <div className="flex min-h-[52px] items-center gap-3 px-4">
+        {back ? (
+          <button
+            type="button"
+            onClick={() => (window.history.length > 1 ? router.back() : router.push(back.href))}
+            className="-ml-2 flex min-h-11 min-w-11 items-center gap-1 px-2 text-[14px] font-semibold"
           >
-            {compactNum(tokens)} TOK
-          </span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden="true">
+              <path d="M15 5l-7 7 7 7" strokeLinecap="square" />
+            </svg>
+            {back.label}
+          </button>
+        ) : (
+          <Link href="/" className="display text-[22px] leading-none" aria-label="FINN, back to the brief">
+            FINN
+          </Link>
         )}
+        {title ? <span className="label ml-auto">{title}</span> : null}
+        {right ? <div className={title ? "" : "ml-auto"}>{right}</div> : null}
       </div>
     </header>
   );

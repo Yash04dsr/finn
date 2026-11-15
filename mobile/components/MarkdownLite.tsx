@@ -10,9 +10,21 @@ interface Props {
   text: string;
   /** Inline color variant for use on colored backgrounds. */
   onAccent?: boolean;
+  /** Called with the citation number when a [n] marker is tapped. */
+  onCite?: (n: number) => void;
 }
 
-export function MarkdownLite({ text, onAccent = false }: Props) {
+const CiteContext = React.createContext<((n: number) => void) | undefined>(undefined);
+
+export function MarkdownLite({ text, onAccent = false, onCite }: Props) {
+  return (
+    <CiteContext.Provider value={onCite}>
+      <Blocks text={text} onAccent={onAccent} />
+    </CiteContext.Provider>
+  );
+}
+
+function Blocks({ text, onAccent }: { text: string; onAccent: boolean }) {
   const blocks = React.useMemo(() => parseBlocks(text), [text]);
   return (
     <View>
@@ -22,7 +34,7 @@ export function MarkdownLite({ text, onAccent = false }: Props) {
             <View key={bi} style={{ flexDirection: 'row', marginTop: bi === 0 ? 0 : 3 }}>
               <Text
                 style={{
-                  color: onAccent ? 'rgba(6,20,14,0.75)' : colors.accent,
+                  color: onAccent ? 'rgba(0,0,0,0.65)' : colors.accent,
                   fontSize: 14,
                   lineHeight: 20,
                   width: 16,
@@ -114,16 +126,32 @@ function parseBlocks(text: string): Block[] {
   return out;
 }
 
-/** Inline **bold** + `code` spans. */
+function Cite({ n }: { n: number }) {
+  const onCite = React.useContext(CiteContext);
+  return (
+    <Text
+      onPress={onCite ? () => onCite(n) : undefined}
+      accessibilityRole="link"
+      accessibilityLabel={`Source ${n}`}
+      style={{ fontSize: 11, fontWeight: '700', color: '#000000', textDecorationLine: 'underline' }}
+    >
+      {` ${n}`}
+    </Text>
+  );
+}
+
+/** Inline **bold**, `code`, and tappable [n] citation markers. */
 function renderInline(text: string, onAccent: boolean): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
-  const re = /\*\*([^*]+)\*\*|`([^`]+)`/g;
+  const re = /\*\*([^*]+)\*\*|`([^`]+)`|\[(\d{1,2})\]/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let k = 0;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) nodes.push(text.slice(last, m.index));
-    if (m[1] !== undefined) {
+    if (m[3] !== undefined) {
+      nodes.push(<Cite key={k++} n={Number(m[3])} />);
+    } else if (m[1] !== undefined) {
       nodes.push(
         <Text key={k++} style={{ fontWeight: '700' }}>
           {m[1]}
@@ -134,8 +162,8 @@ function renderInline(text: string, onAccent: boolean): React.ReactNode[] {
         <Text
           key={k++}
           style={{
-            color: onAccent ? 'rgba(6,20,14,0.9)' : colors.accent,
-            backgroundColor: onAccent ? 'rgba(6,20,14,0.08)' : 'rgba(16,185,129,0.10)',
+            color: onAccent ? '#000000' : colors.accent,
+            backgroundColor: onAccent ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.06)',
             fontSize: 13,
           }}
         >

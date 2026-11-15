@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "./api";
 import type { Settings } from "./types";
 
 export interface UseApiState<T> {
   data: T | null;
+  setData: Dispatch<SetStateAction<T | null>>;
   loading: boolean;
   error: string | null;
   notFound: boolean;
@@ -48,13 +49,15 @@ export function useApi<T>(fetcher: (signal: AbortSignal) => Promise<T>, deps: un
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, nonce]);
 
-  return { data, loading, error, notFound, reload: () => setNonce((n) => n + 1) };
+  return { data, setData, loading, error, notFound, reload: () => setNonce((n) => n + 1) };
 }
 
 export const fetchers = {
-  feed: (hours: number) => (signal: AbortSignal) => api.feed(hours, false, signal),
-  digest: (signal: AbortSignal) => api.digestLatest(signal),
+  brief: (hours: number) => (signal: AbortSignal) => api.brief(hours, signal),
+  alert: (id: number) => (signal: AbortSignal) => api.alert(id, signal),
+  verdicts: (signal: AbortSignal) => api.verdicts(signal),
   company: (ticker: string) => (signal: AbortSignal) => api.company(ticker, signal),
+  ledger: (ticker: string) => (signal: AbortSignal) => api.ledger(ticker, signal),
   companies: (signal: AbortSignal) => api.companies(signal),
   costs: (signal: AbortSignal) => api.costs(signal),
   settings: (signal: AbortSignal) => api.getSettings(signal),

@@ -1,13 +1,18 @@
 import type { BioInfo } from "@/lib/types";
+import { SourceLink } from "@/components/ui";
 
-/** "New CFO" style bio card inside announcement details. */
+/** Who is coming in or going out, with where the background came from. */
 export default function BioCard({ bio }: { bio: BioInfo }) {
   return (
-    <div className="rounded-none border border-[#000000]/[0.12] bg-[#000000]/[0.03] p-3.5">
-      <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#4B5563]">Leadership change</p>
-      <p className="text-[15px] font-semibold text-[#000000]">{bio.name}</p>
-      {bio.role && <p className="mt-0.5 text-[12.5px] text-[#4B5563]">{bio.role}</p>}
-      {bio.background && <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#4B5563]">{bio.background}</p>}
+    <div className="border border-[#E5E7EB] p-4">
+      <p className="text-[17px] font-bold leading-tight">{bio.name}</p>
+      {bio.role ? <p className="mt-0.5 text-[14px] text-[#4B5563]">{bio.role}</p> : null}
+      {bio.background ? <p className="mt-2 text-[14px] leading-relaxed">{bio.background}</p> : null}
+      {bio.source || bio.source_url ? (
+        <p className="mt-2 text-[12.5px]">
+          <SourceLink href={bio.source_url}>{bio.source ? `Source: ${bio.source}` : "Source"}</SourceLink>
+        </p>
+      ) : null}
     </div>
   );
 }

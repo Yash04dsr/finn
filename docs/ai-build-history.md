@@ -28,10 +28,34 @@ Every layer was made to prove itself before moving on:
    integrity, push tickets, idempotency, FTS, and API contracts. Several tests found
    real bugs (FTS sync, digest ordering, fiscal-quarter normalization, stale demo data)
    — those fixes are in the git history.
-4. **A custom eval suite** (`evals/run_evals.py`) asserts the agent-level contract:
-   grounded answers cite [S#] with the right numbers; out-of-corpus questions get
-   refusals, not vibes. 3/3 passing.
-5. **Browser verification on a phone viewport** for the PWA, screenshots included.
+4. **End-to-end evals through the real chat endpoint** (`evals/run_chat_evals.py`):
+   grounded promise question, unseen ticker, out-of-corpus question, advice request,
+   off-topic question, prompt injection, portfolio question. Results saved to
+   `evals/results/latest.json`.
+5. **Screens checked at phone size** in the browser after each change, which caught
+   unlabelled sample numbers, a 16-item "two-minute" brief, and model working notes
+   leaking into answers. Each was fixed and rechecked.
+
+## The redesign pass
+
+After the first version worked, the build was re-planned from the investor's side:
+who the user is (a PM at a concentrated fund), what their day looks like, and which
+pains matter most. That produced the Brief, Verdict, Dig in model and the Promise
+ledger. The plan was checked against widely used agent skills: Impeccable for design,
+the design-taste anti-slop rules, source-driven development for Expo APIs, security
+and hardening, LLM and RAG evaluation, and shipping and launch.
+
+Bugs found in that pass, with live evidence:
+- 119 alerts in the database were 41 real items; old runs had duplicated them.
+- NSE times were read as UTC instead of India time.
+- The research model wrote its private reasoning into answers; fixed with an answer
+  tag and a fast-tier rewrite, with citations validated after the rewrite.
+- Screener's page markup changed, so live quarterly numbers had silently stopped and
+  illustrative numbers were showing instead.
+- The ledger first counted an analyst's question as a management promise; quotes
+  that are questions are now rejected.
+- Parallel ingestion shared one SQLite connection across threads; database access is
+  now serialised.
 
 ## Debugging stories worth reading in the transcripts
 
@@ -49,6 +73,6 @@ Every layer was made to prove itself before moving on:
 ## Model usage
 
 - Cursor agent: planning, backend, delegation, verification.
-- FINN's two logical routing tiers are documented in `docs/ARCHITECTURE.md`; the
-  in-product usage ledger reports provider token metadata by tier. It deliberately
-  does not present token counts as billed monetary cost.
+- FINN's tiers are documented in `docs/ARCHITECTURE.md`. The key permits one model,
+  so the fast tier runs it with low reasoning (measured in `evals/routing_bench.py`).
+  The usage ledger reports provider token counts by tier, not billed money.

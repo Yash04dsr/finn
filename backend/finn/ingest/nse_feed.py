@@ -49,20 +49,28 @@ def _normalize(rec: dict) -> dict | None:
         return None
 
 
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
 def _parse_nse_time(raw: str) -> str:
-    """NSE gives '11-Nov-2026 18:05:00'; normalize to ISO UTC."""
+    """NSE gives '11-Nov-2026 18:05:00' in India time; normalize to ISO UTC."""
     fmts = ["%d-%b-%Y %H:%M:%S", "%d %b %Y %H:%M", "%d-%b-%Y %H:%M"]
     for fmt in fmts:
         try:
-            dt = datetime.strptime(raw.strip(), fmt).replace(tzinfo=timezone.utc)
-            return dt.isoformat()
+            dt = datetime.strptime(raw.strip(), fmt).replace(tzinfo=IST)
+            return dt.astimezone(timezone.utc).isoformat()
         except ValueError:
             continue
     return datetime.now(timezone.utc).isoformat()
 
 
-def fetch_live_announcements() -> list[dict]:
-    """Scrape NSE announcements. Requires a warmed session (NSE sets cookies on homepage)."""
+def fetch_live_announcements(tickers: set[str] | None = None) -> list[dict] | None:
+    """Scrape NSE announcements for the watched tickers.
+
+    Returns None when the exchange could not be reached, and an empty list on a
+    quiet day, so a quiet day is never mistaken for an outage.
+    """
+    watched = tickers or set(ALL_TICKERS)
     s = requests.Session()
     s.headers.update(BROWSER_HEADERS)
     try:
@@ -74,14 +82,13 @@ def fetch_live_announcements() -> list[dict]:
         out = []
         for rec in rows:
             norm = _normalize(rec)
-            if norm and norm["ticker"] in ALL_TICKERS:
+            if norm and norm["ticker"] in watched:
                 out.append(norm)
-        if out:
-            log.info("NSE live: %d announcements for tracked tickers", len(out))
+        log.info("NSE live: %d announcements for watched tickers", len(out))
         return out
     except Exception as exc:
         log.warning("NSE live fetch failed: %s", exc)
-        return []
+        return None
 
 
 def load_snapshot() -> list[dict]:
@@ -93,17 +100,22 @@ def load_snapshot() -> list[dict]:
     return rows
 
 
-def fetch_announcements(snapshot_anchor: datetime | None = None) -> tuple[list[dict], str]:
-    """Returns (filings, mode) where mode is 'live' or 'snapshot'."""
-    live = fetch_live_announcements()
-    if live:
+def fetch_announcements(snapshot_anchor: datetime | None = None, sample: bool = False,
+                        tickers: set[str] | None = None) -> tuple[list[dict], str]:
+    """Returns (filings, mode) where mode is 'live', 'sample', or 'unavailable'.
+
+    The sample day is only used when asked for. A live outage returns nothing
+    rather than passing sample filings off as today's activity.
+    """
+    if not sample:
+        live = fetch_live_announcements(tickers)
+        if live is None:
+            return [], "unavailable"
         return live, "live"
-    snap = load_snapshot()
-    mode = "snapshot" if snap else "none"
-    log.info("Using %s announcements snapshot (%d rows)", mode, len(snap))
-    # Re-date against a persisted anchor supplied by the pipeline. Reusing the
-    # anchor makes repeated demo runs produce the same filing identities.
-    return _redate(snap, anchor=snapshot_anchor), mode
+    snap = [r for r in load_snapshot() if not tickers or r["ticker"] in tickers]
+    log.info("Using the labelled sample day (%d filings)", len(snap))
+    rows = [{**r, "source": "sample"} for r in snap]
+    return _redate(rows, anchor=snapshot_anchor), "sample"
 
 
 def _redate(rows: list[dict], hours_back: int = 20,

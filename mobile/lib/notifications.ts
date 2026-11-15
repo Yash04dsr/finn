@@ -149,7 +149,7 @@ export function routeNotificationResponse(response: Notifications.NotificationRe
       },
     });
   } else {
-    router.push({ pathname: '/', params: { alert: destination.alert } });
+    router.push({ pathname: '/alert/[id]', params: { id: destination.alert } });
   }
   return true;
 }

@@ -8,8 +8,9 @@ import { colors, radius, type } from '../lib/theme';
 import { fmtCr } from '../lib/format';
 import type { Bio, Facts } from '../lib/types';
 import { PctChip } from './ui';
+import { openSource } from '../lib/open';
 
-export function FactsTable({ facts }: { facts: Facts }) {
+export function FactsTable({ facts, sample }: { facts: Facts; sample?: boolean }) {
   if (!facts?.rows?.length) return null;
   return (
     <View
@@ -38,6 +39,7 @@ export function FactsTable({ facts }: { facts: Facts }) {
           QoQ · YoY
         </Text>
       </View>
+      <SourceLine facts={sample ? { ...facts, is_illustrative: true } : facts} />
       {facts.rows.map((row, i) => (
         <View
           key={`${row.label}-${i}`}
@@ -64,6 +66,36 @@ export function FactsTable({ facts }: { facts: Facts }) {
   );
 }
 
+const SOURCE_LABEL: Record<string, string> = {
+  illustrative_snapshot: 'Illustrative numbers for the demo, not reported figures',
+  screener_live: 'Source: Screener.in (secondary)',
+  screener: 'Source: Screener.in (secondary)',
+  results_filing: 'Source: company results filing',
+};
+
+/** Where the numbers came from, shown on every table so nothing illustrative passes as reported. */
+export function SourceLine({ facts }: { facts: { source?: string; is_illustrative?: boolean } }) {
+  const key = facts.is_illustrative ? 'illustrative_snapshot' : facts.source ?? '';
+  const label = SOURCE_LABEL[key];
+  if (!label) return null;
+  const warn = key === 'illustrative_snapshot';
+  return (
+    <Text
+      style={[
+        type.micro,
+        {
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          color: warn ? colors.neg : colors.muted,
+          backgroundColor: warn ? colors.redDim : 'transparent',
+        },
+      ]}
+    >
+      {label}
+    </Text>
+  );
+}
+
 export function BioCard({ bio }: { bio: Bio }) {
   return (
     <View
@@ -80,8 +112,8 @@ export function BioCard({ bio }: { bio: Bio }) {
           style={{
             width: 34,
             height: 34,
-            borderRadius: 17,
-            backgroundColor: colors.accentDim,
+            borderRadius: 0,
+            backgroundColor: colors.surface2,
             alignItems: 'center',
             justifyContent: 'center',
             marginRight: 10,
@@ -101,6 +133,15 @@ export function BioCard({ bio }: { bio: Bio }) {
         </View>
       </View>
       <Text style={[type.small, { lineHeight: 18 }]}>{bio.background}</Text>
+      {bio.source ? (
+        <Text
+          onPress={bio.source_url ? () => openSource(bio.source_url) : undefined}
+          accessibilityRole={bio.source_url ? 'link' : 'text'}
+          style={[type.micro, { marginTop: 6, textDecorationLine: bio.source_url ? 'underline' : 'none' }]}
+        >
+          Source: {bio.source}
+        </Text>
+      ) : null}
     </View>
   );
 }

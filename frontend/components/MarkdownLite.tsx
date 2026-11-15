@@ -7,19 +7,27 @@ import { Fragment, type ReactNode } from "react";
  * ### headings and paragraph breaks. Zero dependencies.
  */
 
-function inline(text: string, keyBase: string): ReactNode[] {
+type CiteRenderer = (n: number, key: string) => ReactNode;
+
+function inline(text: string, keyBase: string, cite?: CiteRenderer): ReactNode[] {
   const out: ReactNode[] = [];
-  const re = /\*\*([^*]+)\*\*/g;
+  const re = /\*\*([^*]+)\*\*|\[S?(\d{1,3})\]/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let i = 0;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(<Fragment key={`${keyBase}-t${i}`}>{text.slice(last, m.index)}</Fragment>);
-    out.push(
-      <strong key={`${keyBase}-b${i}`} className="fin-strong">
-        {m[1]}
-      </strong>
-    );
+    if (m[1] != null) {
+      out.push(
+        <strong key={`${keyBase}-b${i}`} className="fin-strong">
+          {m[1]}
+        </strong>
+      );
+    } else if (cite) {
+      out.push(cite(Number(m[2]), `${keyBase}-c${i}`));
+    } else {
+      out.push(<Fragment key={`${keyBase}-c${i}`}>{m[0]}</Fragment>);
+    }
     last = m.index + m[0].length;
     i++;
   }
@@ -27,7 +35,7 @@ function inline(text: string, keyBase: string): ReactNode[] {
   return out;
 }
 
-export default function MarkdownLite({ text }: { text: string }) {
+export default function MarkdownLite({ text, cite }: { text: string; cite?: CiteRenderer }) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
   let para: string[] = [];
@@ -40,7 +48,7 @@ export default function MarkdownLite({ text }: { text: string }) {
     const joined = para.join(" ");
     blocks.push(
       <p key={`p${key++}`} className="fin-p">
-        {inline(joined, `p${key}`)}
+        {inline(joined, `p${key}`, cite)}
       </p>
     );
     para = [];
@@ -49,7 +57,7 @@ export default function MarkdownLite({ text }: { text: string }) {
     if (!list.length) return;
     const items = list.map((l, i) => (
       <li key={`li${i}`} className="fin-li">
-        {inline(l, `li${key}-${i}`)}
+        {inline(l, `li${key}-${i}`, cite)}
       </li>
     ));
     blocks.push(
@@ -78,8 +86,8 @@ export default function MarkdownLite({ text }: { text: string }) {
       flushPara();
       flushList();
       blocks.push(
-        <p key={`h${key++}`} className="mb-1 mt-1 text-[13px] font-semibold text-[#000000]">
-          {inline(h[1], `h${key}`)}
+        <p key={`h${key++}`} className="mb-1 mt-2 text-[15px] font-bold text-black">
+          {inline(h[1], `h${key}`, cite)}
         </p>
       );
       continue;

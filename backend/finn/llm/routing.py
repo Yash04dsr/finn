@@ -35,9 +35,21 @@ class Tier:
 
 TIER_MODELS = {Tier.FAST: MODEL_FAST, Tier.REASONING: MODEL_REASONING}
 
+# The fast tier turns the model's hidden reasoning down: classifying a filing took
+# 6 output tokens instead of 143 on the same model with the same answer. The
+# reasoning tier keeps full thinking for research synthesis.
+TIER_PARAMS = {
+    Tier.FAST: {"reasoning_effort": os.getenv("FINN_FAST_REASONING_EFFORT", "low")},
+    Tier.REASONING: {},
+}
+
 
 def model_for(tier: str) -> str:
     return TIER_MODELS.get(tier, MODEL_FAST)
+
+
+def params_for(tier: str) -> dict:
+    return {k: v for k, v in TIER_PARAMS.get(tier, {}).items() if v}
 
 
 def record_usage(scope: str, tier: str, usage) -> dict:
@@ -147,12 +159,15 @@ async def chat(tier: str, messages: list[dict], scope: str, json_mode: bool = Fa
     import litellm
 
     ensure_llm_env()
-    budget = min(max_tokens * 3, 4000)  # headroom for thinking tokens
+    extra = params_for(tier)
+    # Low-effort calls need little headroom; full reasoning needs room to think before answering.
+    budget = min(max_tokens + 200, 2000) if extra.get("reasoning_effort") == "low" else min(max_tokens * 3, 4000)
     resp = await litellm.acompletion(
         model=f"openai/{model_for(tier)}",
         messages=messages,
         max_tokens=budget,
         temperature=temperature,
+        **extra,
         **({"response_format": {"type": "json_object"}} if json_mode else {}),
     )
     record_usage(scope, tier, resp.usage)

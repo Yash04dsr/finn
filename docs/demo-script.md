@@ -1,72 +1,46 @@
-# FINN — 3-minute demo script (Expo app)
+# FINN: three-minute demo (Web PWA)
 
-Setup: backend running (locally or deployed). Expo app open via Expo Go.
-If the feed is empty: **Settings → Ops → "Run demo pipeline"** once, then pull to refresh.
+**A brief you finish, graded against management's own words.**
 
----
+Before starting: open the Vercel web app (`frontend/`). If the brief is empty, go to **Settings → Load the sample day**. (If the Render free-tier backend was asleep, the first load takes ~30–50s.)
 
-## 0:00 — The morning brief (Push)
+## 0:00 Step 1 — Finish the Brief and record verdicts
 
-Open the **Feed** tab.
+Open **Brief** (`/`).
 
-> "Every morning FINN gives me one screen: what changed across my 17 companies,
-> ranked so what matters is first."
+> "Every morning FINN gives me one decision at a time. NSE publishes over a thousand filings a day; here are the items that matter to my book, and routine filings are counted, not shown."
 
-- Point at the **digest hero**: "9 shown · 4 routine collapsed" — routine paperwork is
-  *counted, not shown*. The app earns attention instead of demanding it.
-- Tap the **Persistent results** alert → detail sheet shows the **first cut**:
-  Revenue / EBITDA / PBT / PAT with QoQ and YoY chips — computed from stored filings,
-  not the model's memory.
-- Tap the **CFO change** alert → FINN's one-line summary plus the **incoming person
-  card** — you instantly know who is taking over.
-- Tap **"Why am I seeing this?"** → the reason is spelled out (category, tier, your
-  watchlist). Explainability is a right, not an easter egg.
+- Point at the focus card (`Decide 1 of N`):
+  - the inline Revenue, EBITDA, and PAT with year-on-year change (labelled when illustrative)
+  - the **Touches** line, naming the watchpoint it bears on, and any past verdict on similar filings
+- Tap **No impact**. The next item comes up. Tap **Show fewer results filings** in the toast to show that ranking learns from decisions.
+- Tap **Changes the story** on a later card and add a one-line reason—saved to the decision journal.
+- Tap **Listen** for a few seconds: the commute version of the same brief (`speechSynthesis`, `en-IN`).
+- Finish the remaining items to reach the **You are done for this window** end state.
 
-## 1:10 — Unusual means what I say (Settings)
+## 0:55 Step 2 — Promise Check and Promise Ledger
 
-Go to **Settings**.
+Tap a results alert or open `/alert/[id]` (also where Web Push notifications deep-link):
 
-- Slide **volume multiplier** from 2.5× to 5×, then tap **Save changes**:
-  "I decide what 'unusual' means. The engine watches every EOD bar against *my*
-  thresholds."
-- Point at **Token usage**: provider-reported tokens, fast vs reasoning split.
-  "This is transparent usage telemetry—not a made-up rupee estimate."
-- (If push was enabled): "This exact alert would have buzzed my phone at 18:30."
+- **PromiseCheck**: delivered numbers graded in code against management's earlier guided band (`kept`, `missed`, `in_band`, or `no_guidance`), with links to both the guidance quote and the results filing.
+- For leadership filings, the **BioCard** shows the appointee's background extracted from the SEBI LODR filing itself.
+- Tap through to the company page (`/company/PERSISTENT`):
+  - **Promise ledger** at the top: credibility summary (e.g. "Kept X of Y checkable promises") and each commitment graded against reported numbers, citing the transcript PDF.
+  - **Decision history**: your recorded verdicts and reasons for this company, newest first.
 
-## 1:50 — The grounded analyst (Pull)
+## 2:00 Step 3 — Unseen NSE/BSE ticker on demand
 
-Go to **Chat** (or tap "Ask FINN about this filing" from any alert).
+Open **Ask** (`/chat`) or visit a new ticker page:
 
-Ask: **"What did Persistent report about Q2 FY26 margin drivers and cash conversion?"**
+- Ask about a pre-loaded company first: "Did PERSISTENT deliver what management promised?"
+  - The answer streams with primary-source citations `[1]`, `[2]` verified on the server, and source cards that open the issuer or BSE PDF.
+  - The footer shows the model tier (`reasoning`), token count, cost (when priced), and cache state.
+- Ask "Should I buy Persistent?": one sentence, no call.
+- Ask about an unseen NSE/BSE ticker (for example, `VEDL` or `ITC`):
+  - Staged progress shows FINN pulling live quarterly numbers, finding and reading the newest transcripts (or annual report for ITC), and grading promises—then answering with primary-source citations.
 
-> "This is the narrative-vs-numbers question — the difference between summarising
-> management and analysing them."
+## Likely questions
 
-- Watch the tool chips: it searches the issuer-hosted Q2 transcript and answers with
-  **[S#] citations**. Tap a citation chip to open the Persistent-hosted PDF and inspect
-  the cited passage.
-- Follow up: **"What changed between Crompton's Q1 commentary and Q2 results?"** FINN
-  compares Crompton's issuer-hosted call transcript and Q2 investor presentation.
-- Then: **"Suzlon Q2 numbers?"** → FINN **refuses**: not in the primary sources.
-  Grounded means grounded — no vibes, no news, no model memory.
-
-## 2:50 — Close
-
-Back to **Feed**: "Prices and volume run through the same threshold engine — that
-volume-spike alert exists because I set 2.5×. Everything on this screen is either
-important, or a count of what wasn't."
-
----
-
-## One-line answers for likely questions
-
-- **Why not vector search?** Corpus is small and lexical; BM25 with citations is
-  precise and testable. The retrieval interface is the seam for embeddings later.
-- **What stops hallucination?** The model never computes numbers (pure-Python metrics
-  tool), and the eval suite asserts cite-or-refuse. Primary sources only.
-- **How is this different from a ChatGPT wrapper?** Deterministic alerting you can
-  configure, deterministic math, a citation contract with tests, and cost visible in
-  the product. The LLM is a component, not the product.
-- **What's the model cost per day?** FINN reports token usage by tier, not money. A
-  billed-cost claim needs the provider's pricing and cache accounting, so the UI does
-  not invent one.
+- **Why web-first instead of Expo?** Zero install for graders on any phone or desktop, with `mobile/` kept in the repo as an additional native client. On iOS 16.4+, Web Push works after **Add to Home Screen** in Safari.
+- **How is cost controlled?** Code does the math, `promise_check`, and ranking. The fast tier runs with `reasoning_effort=low` (68 vs 607 output tokens on the same jobs). Guidance extraction is cached per document, and research answers are reused at 0 tokens until documents or numbers change.
+- **What stops hallucination?** Routing in code, primary documents only, server-side citation checks, and quotes verified against source passages.

@@ -1,6 +1,6 @@
 // FINN service worker — deliberately minimal: network-first passthrough with
 // offline fallback for navigations. Cache versioning so old shells drop cleanly.
-const CACHE = "finn-static-v2";
+const CACHE = "finn-static-v3";
 const SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -29,19 +29,36 @@ self.addEventListener("push", (event) => {
     payload = { body: event.data ? event.data.text() : "" };
   }
   const title = payload.title || "FINN";
+  const url = targetFor(payload);
   const options = {
     body: payload.body || "A portfolio alert needs your attention.",
     icon: "/icon.svg",
     badge: "/icon.svg",
-    data: { url: payload.url || "/" },
-    tag: payload.url || "finn-alert",
+    data: { url },
+    tag: url,
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+// Notifications open the evidence screen for the alert: /alert/{id}.
+// Accepts an explicit alert id, an /alert/{id} url, or the older /?alert={id} form.
+function targetFor(payload) {
+  const id = payload.alert_id ?? payload.id ?? payload.data?.alert_id;
+  if (id != null && /^\d+$/.test(String(id))) return `/alert/${id}`;
+  const raw = payload.url || payload.data?.url || "/";
+  try {
+    const u = new URL(raw, self.location.origin);
+    const legacy = u.searchParams.get("alert");
+    if (legacy && /^\d+$/.test(legacy)) return `/alert/${legacy}`;
+    return u.pathname + u.search;
+  } catch {
+    return "/";
+  }
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  const target = new URL(targetFor(event.notification.data || {}), self.location.origin).href;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       const existing = clients.find((client) => client.url === target);

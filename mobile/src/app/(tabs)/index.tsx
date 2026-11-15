@@ -1,26 +1,19 @@
 /**
- * FEED — window chips, digest hero, grouped alerts, detail modal.
+ * BRIEF — the investor's two-minute decision pass.
+ * One material item in focus, a verdict to clear it, the rest waiting below,
+ * and an explicit end state. Routine filings are counted, not shown.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, PanResponder, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api, getBaseUrl, ApiError } from '../../../lib/api';
-import { colors, radius, type } from '../../../lib/theme';
-import type { Alert, Bio, Digest, Facts, MetricPayload, AnnouncementPayload } from '../../../lib/types';
-import { DigestCard } from '../../../components/DigestCard';
-import { AlertRow } from '../../../components/AlertRow';
-import { BioCard, FactsTable } from '../../../components/FactsTable';
-import { Sparkline } from '../../../components/charts';
-import {
-  CategoryChip,
-  ErrorCard,
-  ListSkeleton,
-  SectionHeader,
-  Spinner,
-  TickerBadge,
-} from '../../../components/ui';
-import { relTime } from '../../../lib/format';
+import * as Speech from 'expo-speech';
+import { api, ApiError, getBaseUrl } from '../../../lib/api';
+import { colors, type } from '../../../lib/theme';
+import { catLabel } from '../../../lib/format';
+import type { AnnouncementPayload, Brief, BriefItem, Verdict } from '../../../lib/types';
+import { Wordmark } from '../../../components/Wordmark';
+import { CompactRow, FocusCard, VERDICT_LABEL, VerdictBar, headlineOf } from '../../../components/brief';
+import { ErrorCard, ListSkeleton, SectionHeader } from '../../../components/ui';
 
 const WINDOWS: { label: string; hours: number }[] = [
   { label: '12h', hours: 12 },
@@ -29,43 +22,34 @@ const WINDOWS: { label: string; hours: number }[] = [
   { label: '7d', hours: 168 },
 ];
 
-export default function FeedScreen() {
+interface Toast {
+  text: string;
+  action?: { label: string; run: () => void };
+}
+
+export default function BriefScreen() {
   const params = useLocalSearchParams<{ alert?: string }>();
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
   const [hours, setHours] = useState(24);
-  const [alerts, setAlerts] = useState<Alert[] | null>(null);
-  const [digest, setDigest] = useState<Digest | null>(null);
+  const [brief, setBrief] = useState<Brief | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<Alert | null>(null);
-  const mounted = useRef(true);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [showBackground, setShowBackground] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [focusId, setFocusId] = useState<number | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = useCallback(async (h: number) => {
-    setLoading(true);
+  const load = useCallback(async (h: number, quiet = false) => {
+    if (!quiet) setLoading(true);
     setError(null);
     try {
-      const [feed, dig] = await Promise.all([
-        api.feed(h, false),
-        api.digestLatest().catch(() => null), // digest is optional decoration
-      ]);
-      if (!mounted.current) return;
-      setAlerts(feed.alerts);
-      setDigest(dig);
+      setBrief(await api.brief(h));
     } catch (e) {
-      if (!mounted.current) return;
-      setAlerts([]);
       setError(e instanceof ApiError ? e.message : 'Network request failed');
     } finally {
-      if (mounted.current) setLoading(false);
+      setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
   }, []);
 
   useEffect(() => {
@@ -74,377 +58,344 @@ export default function FeedScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // refresh on tab focus; stale data stays visible while loading
-      void load(hours);
+      void load(hours, true);
+      return () => {
+        void Speech.stop();
+        setSpeaking(false);
+      };
     }, [hours, load]),
   );
 
-  const attention = useMemo(() => (alerts ?? []).filter((a) => a.priority <= 2), [alerts]);
-  const rest = useMemo(() => (alerts ?? []).filter((a) => a.priority >= 3), [alerts]);
-  const routedAlert = useMemo(
-    () => (params.alert ? alerts?.find((item) => String(item.id) === params.alert) : null),
-    [alerts, params.alert],
+  useEffect(() => {
+    if (params.alert) router.push({ pathname: '/alert/[id]', params: { id: params.alert } });
+  }, [params.alert]);
+
+  const queue = brief?.material ?? [];
+  const focus = useMemo(
+    () => queue.find((i) => i.id === focusId) ?? queue[0] ?? null,
+    [queue, focusId],
   );
-  const displayedAlert = selected ?? routedAlert;
+  const waiting = queue.filter((i) => i.id !== focus?.id);
+  const total = queue.length + (brief?.done.filter((d) => d.priority <= 1).length ?? 0);
+  const position = total - queue.length + 1;
+
+  // Reaching the end of the brief counts as having looked.
+  useEffect(() => {
+    if (brief && queue.length === 0) void api.briefSeen().catch(() => undefined);
+  }, [brief, queue.length]);
+
+  const showToast = (t: Toast) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(t);
+    toastTimer.current = setTimeout(() => setToast(null), 5000);
+  };
+
+  const decide = async (item: BriefItem, verdict: Verdict) => {
+    if (busy) return;
+    setBusy(true);
+    // Clear it from the queue straight away; the server call confirms it.
+    setBrief((b) =>
+      b && {
+        ...b,
+        material: b.material.filter((i) => i.id !== item.id),
+        done: [{ ...item, verdict }, ...b.done],
+      },
+    );
+    setFocusId(null);
+    try {
+      await api.verdict(item.id, verdict);
+      const category = (item.payload as Partial<AnnouncementPayload>).category;
+      if (verdict === 'changes_story') {
+        router.push({ pathname: '/alert/[id]', params: { id: String(item.id) } });
+      } else if (verdict === 'no_impact' && category && item.kind === 'announcement') {
+        showToast({
+          text: `${item.ticker} marked No impact`,
+          action: {
+            label: `Show fewer ${catLabel(category).toLowerCase()} filings`,
+            run: async () => {
+              await api.verdict(item.id, 'no_impact', true).catch(() => undefined);
+              showToast({ text: `${catLabel(category)} filings now rank lower` });
+              void load(hours, true);
+            },
+          },
+        });
+      } else {
+        showToast({ text: `${item.ticker} marked ${VERDICT_LABEL[verdict]}` });
+      }
+    } catch {
+      showToast({ text: 'Could not save that decision. Pull down to refresh and try again.' });
+      void load(hours, true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const listen = async () => {
+    if (speaking) {
+      await Speech.stop();
+      setSpeaking(false);
+      return;
+    }
+    if (!brief) return;
+    setSpeaking(true);
+    Speech.speak(spokenBrief(brief), {
+      language: 'en-IN',
+      rate: 1.0,
+      onDone: () => setSpeaking(false),
+      onStopped: () => setSpeaking(false),
+      onError: () => setSpeaking(false),
+    });
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Wordmark />
       <ScrollView
-        contentContainerStyle={{
-          paddingTop: insets.top + 10,
-          paddingHorizontal: 16,
-          paddingBottom: 110,
-        }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load(hours)} tintColor="#000000" />}
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            marginBottom: 14,
-          }}
-        >
-          <Text style={type.title}>Feed</Text>
-          <Text style={type.micro}>{alerts ? `${alerts.length} alerts` : ''}</Text>
-        </View>
-
-        {/* window chips */}
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {WINDOWS.map((w) => {
             const active = w.hours === hours;
             return (
               <Pressable
                 key={w.hours}
                 onPress={() => setHours(w.hours)}
-                style={({ pressed }) => ({
-                  opacity: pressed ? 0.7 : 1,
-                  paddingHorizontal: 14,
-                  paddingVertical: 6,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: active ? colors.accent : colors.borderStrong,
-                  backgroundColor: active ? colors.accentDim : 'transparent',
-                })}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Last ${w.label}`}
+                style={{ minHeight: 48, paddingHorizontal: 13, justifyContent: 'center' }}
               >
-                <Text
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: '600',
-                    color: active ? colors.accent : colors.muted,
-                  }}
-                >
+                <Text style={{ fontSize: 13, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', color: active ? '#000000' : colors.muted }}>
                   {w.label}
                 </Text>
+                <View style={{ position: 'absolute', left: 8, right: 8, bottom: 8, height: 2, backgroundColor: active ? '#000000' : 'transparent' }} />
               </Pressable>
             );
           })}
+          <Pressable
+            onPress={listen}
+            disabled={!brief}
+            accessibilityRole="button"
+            accessibilityLabel={speaking ? 'Stop reading the brief' : 'Listen to the brief'}
+            style={({ pressed }) => ({
+              marginLeft: 'auto',
+              minHeight: 40,
+              paddingHorizontal: 12,
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: '#000000',
+              backgroundColor: speaking ? '#000000' : '#FFFFFF',
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', color: speaking ? '#FFFFFF' : '#000000' }}>
+              {speaking ? 'Stop' : 'Listen'}
+            </Text>
+          </Pressable>
         </View>
 
         {error ? (
           <ErrorCard
             message={error}
-            hint={`Backend: ${getBaseUrl()}\nStart it: cd backend && uv run uvicorn finn.api.main:app --port 8000`}
+            hint={`FINN could not reach ${getBaseUrl()}. Check the connection and pull down to retry.`}
           />
-        ) : loading && alerts === null ? (
-          <ListSkeleton rows={7} />
-        ) : (
+        ) : loading && !brief ? (
+          <ListSkeleton rows={5} />
+        ) : brief ? (
           <>
-            <DigestCard digest={digest} />
-            <View style={{ height: 18 }} />
+            {brief.is_sample ? (
+              <Text style={[type.micro, { marginTop: 4, marginBottom: 2 }]}>
+                Sample day for the demo. Live NSE filings replace it on the evening run.
+              </Text>
+            ) : null}
+            <Text style={[type.small, { marginTop: 6, marginBottom: 12, color: colors.text }]}>
+              {queue.length
+                ? `${queue.length} to decide${brief.new_since_last_look ? `, ${brief.new_since_last_look} new since you last looked` : ''}. ${brief.worth_a_look.length} worth a look. ${brief.routine_count} routine filings hidden.`
+                : `Nothing left to decide. ${brief.worth_a_look.length} worth a look, ${brief.routine_count} routine filings hidden.`}
+            </Text>
 
-            {alerts && alerts.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 30 }}>
-                <Text style={[type.h3, { marginBottom: 4 }]}>All quiet</Text>
-                <Text style={type.small}>No alerts in this window.</Text>
-              </View>
-            ) : (
+            {focus ? (
               <>
-                {attention.length > 0 && (
-                  <View style={{ marginBottom: 20 }}>
-                    <SectionHeader title="Needs attention" hint={`${attention.length}`} />
-                    <View
-                      style={{
-                        backgroundColor: colors.surface,
-                        borderRadius: radius.lg,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {attention.map((a, i) => (
-                        <View
-                          key={a.id}
-                          style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.border }}
-                        >
-                          <AlertRow alert={a} onPress={setSelected} />
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-                {rest.length > 0 && (
-                  <View>
-                    <SectionHeader title="Rest of the day" hint={`${rest.length}`} />
-                    <View
-                      style={{
-                        backgroundColor: colors.surface,
-                        borderRadius: radius.lg,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {rest.map((a, i) => (
-                        <View
-                          key={a.id}
-                          style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.border }}
-                        >
-                          <AlertRow alert={a} onPress={setSelected} />
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={type.micro}>DECIDE {Math.min(position, total)} OF {total}</Text>
+                  <Text style={type.micro}>Swipe left: no impact. Right: watch.</Text>
+                </View>
+                <Swipe key={focus.id} onLeft={() => decide(focus, 'no_impact')} onRight={() => decide(focus, 'watch')}>
+                  <FocusCard
+                    item={focus}
+                    onOpen={() => router.push({ pathname: '/alert/[id]', params: { id: String(focus.id) } })}
+                  />
+                </Swipe>
+                <VerdictBar busy={busy} onVerdict={(v) => decide(focus, v)} />
               </>
+            ) : (
+              <DoneCard brief={brief} />
             )}
+
+            {waiting.length ? (
+              <View style={{ marginTop: 22 }}>
+                <SectionHeader title="Up next" hint={`${waiting.length}`} />
+                {waiting.map((i) => (
+                  <CompactRow key={i.id} item={i} onPress={() => setFocusId(i.id)} />
+                ))}
+              </View>
+            ) : null}
+
+            {brief.worth_a_look.length ? (
+              <View style={{ marginTop: 22 }}>
+                <SectionHeader title="Worth a look" hint={`${brief.worth_a_look.length}`} />
+                {brief.worth_a_look.map((i) => (
+                  <CompactRow
+                    key={i.id}
+                    item={i}
+                    onPress={() => router.push({ pathname: '/alert/[id]', params: { id: String(i.id) } })}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            {brief.background.length ? (
+              <View style={{ marginTop: 22 }}>
+                <Pressable
+                  onPress={() => setShowBackground((s) => !s)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showBackground }}
+                  style={{ minHeight: 44, justifyContent: 'center' }}
+                >
+                  <SectionHeader
+                    title={`Background · ${brief.background.length}`}
+                    hint={showBackground ? 'Hide' : 'Show'}
+                  />
+                </Pressable>
+                {showBackground
+                  ? brief.background.map((i) => (
+                      <CompactRow
+                        key={i.id}
+                        item={i}
+                        onPress={() => router.push({ pathname: '/alert/[id]', params: { id: String(i.id) } })}
+                      />
+                    ))
+                  : (
+                    <Text style={type.micro}>Dividends, notices and press releases that do not need a decision.</Text>
+                  )}
+              </View>
+            ) : null}
+
+            {brief.done.length ? (
+              <View style={{ marginTop: 22 }}>
+                <SectionHeader title="Decided" hint={`${brief.done.length}`} />
+                {brief.done.map((i) => (
+                  <CompactRow
+                    key={i.id}
+                    item={i}
+                    right={i.verdict ? VERDICT_LABEL[i.verdict] : undefined}
+                    onPress={() => router.push({ pathname: '/alert/[id]', params: { id: String(i.id) } })}
+                  />
+                ))}
+              </View>
+            ) : null}
           </>
-        )}
+        ) : null}
       </ScrollView>
 
-      {loading && alerts !== null ? (
-        <View style={{ position: 'absolute', top: insets.top + 12, right: 18 }}>
-          <Spinner size={14} />
-        </View>
-      ) : null}
-
-      {displayedAlert ? (
-        <AlertDetailModal
-          alert={displayedAlert}
-          width={width}
-          onClose={() => {
-            setSelected(null);
-            if (routedAlert) router.setParams({ alert: '' });
+      {toast ? (
+        <View
+          accessibilityLiveRegion="polite"
+          style={{
+            position: 'absolute',
+            left: 12,
+            right: 12,
+            bottom: 12,
+            backgroundColor: '#000000',
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            gap: 6,
           }}
-        />
+        >
+          <Text style={{ color: '#FFFFFF', fontSize: 13.5 }}>{toast.text}</Text>
+          {toast.action ? (
+            <Pressable
+              onPress={() => {
+                const run = toast.action?.run;
+                setToast(null);
+                run?.();
+              }}
+              accessibilityRole="button"
+              style={{ minHeight: 36, justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' }}>
+                {toast.action.label}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
 }
 
-// --- Detail modal (bottom-sheet-style overlay) -------------------------------------
-
-function AlertDetailModal({
-  alert,
-  onClose,
-}: {
-  alert: Alert;
-  width: number;
-  onClose: () => void;
-}) {
-  const insets = useSafeAreaInsets();
-  const [showWhy, setShowWhy] = useState(false);
-  const p = alert.payload as AnnouncementPayload & Partial<MetricPayload>;
-
-  const category = p.category ?? alert.kind;
-  const isAnnouncement = alert.kind === 'announcement';
-  const change = p.change_pct ?? null;
-
+function DoneCard({ brief }: { brief: Brief }) {
+  const decided = brief.done.length;
+  const changes = brief.done.filter((d) => d.verdict === 'changes_story').length;
+  const watch = brief.done.filter((d) => d.verdict === 'watch').length;
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 30 }}>
-      {/* scrim */}
-      <Pressable
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(2,6,12,0.62)' }}
-        onPress={onClose}
-      />
-      {/* sheet */}
-      <View
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          maxHeight: '88%',
-          backgroundColor: colors.bg,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          borderTopWidth: 1,
-          borderTopColor: colors.borderStrong,
-          paddingBottom: insets.bottom + 12,
-        }}
-      >
-        {/* grabber */}
-        <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 2 }}>
-          <View style={{ width: 38, height: 4.5, borderRadius: 3, backgroundColor: colors.borderStrong }} />
-        </View>
-
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, gap: 14 }}>
-          {/* header */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <TickerBadge ticker={alert.ticker} size={40} />
-            <View style={{ flex: 1 }}>
-              <Text style={[type.h3, { fontSize: 14 }]}>{alert.ticker}</Text>
-              <Text style={type.micro}>{relTime(alert.created_at)}</Text>
-            </View>
-            <CategoryChip label={category} />
-          </View>
-
-          <Text style={[type.title, { fontSize: 18, lineHeight: 24 }]}>
-            {isAnnouncement
-              ? p.headline
-              : `${alert.ticker}: ${alert.kind === 'volume_spike' ? 'unusual volume' : 'sharp price move'}`}
-          </Text>
-
-          {/* metric payload specifics */}
-          {!isAnnouncement && (
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: colors.surface,
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  padding: 12,
-                }}
-              >
-                <Text style={type.micro}>{alert.kind === 'volume_spike' ? 'Volume' : 'Move'}</Text>
-                <Text
-                  style={[
-                    type.title,
-                    {
-                      fontSize: 20,
-                      marginTop: 2,
-                      fontVariant: ['tabular-nums'],
-                      color:
-                        alert.kind === 'price_move' && change != null && change < 0
-                          ? colors.red
-                          : alert.kind === 'price_move'
-                            ? colors.accent
-                            : colors.text,
-                    },
-                  ]}
-                >
-                  {alert.kind === 'volume_spike'
-                    ? `${(p.value ?? 0).toFixed(1)}x`
-                    : `${(change ?? 0) > 0 ? '+' : ''}${(change ?? 0).toFixed(1)}%`}
-                </Text>
-                <Text style={type.micro}>
-                  threshold {(p.threshold ?? 0).toFixed(1)}
-                  {alert.kind === 'volume_spike' ? 'x' : '%'}
-                </Text>
-              </View>
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: colors.surface,
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  padding: 12,
-                }}
-              >
-                <Text style={type.micro}>Close</Text>
-                <Text style={[type.title, { fontSize: 20, marginTop: 2, fontVariant: ['tabular-nums'] }]}>
-                  ₹{(p.close ?? 0).toLocaleString('en-IN')}
-                </Text>
-                {p.spark && p.spark.length > 1 ? (
-                  <View style={{ marginTop: 6 }}>
-                    <Sparkline points={p.spark} width={110} height={26} />
-                  </View>
-                ) : null}
-              </View>
-            </View>
-          )}
-
-          {/* FINN's take */}
-          {p.summary ? (
-            <View>
-              <SectionHeader title="FINN's take" />
-              <Text style={[type.body, { lineHeight: 21 }]}>{p.summary}</Text>
-            </View>
-          ) : null}
-
-          {/* results facts table */}
-          {p.facts ? (
-            <View>
-              <SectionHeader title={`Results · ${p.facts.period}`} />
-              <FactsTable facts={p.facts as Facts} />
-            </View>
-          ) : null}
-
-          {/* management bio */}
-          {p.bio ? (
-            <View>
-              <SectionHeader title="Who is this" />
-              <BioCard bio={p.bio as Bio} />
-            </View>
-          ) : null}
-
-          {/* why disclosure */}
-          <Pressable
-            onPress={() => setShowWhy((s) => !s)}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.75 : 1,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: radius.md,
-              paddingHorizontal: 12,
-              paddingVertical: 11,
-            })}
-          >
-            <Text style={{ color: colors.muted, fontSize: 13, fontWeight: '600' }}>
-              Why am I seeing this?
-            </Text>
-            <Text style={{ color: colors.faint, fontSize: 15 }}>{showWhy ? '−' : '+'}</Text>
-          </Pressable>
-          {showWhy ? (
-            <View
-              style={{
-                backgroundColor: colors.surface2,
-                borderRadius: radius.md,
-                padding: 12,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <Text style={[type.small, { lineHeight: 18 }]}>{alert.why}</Text>
-              {p.filed_at ? (
-                <Text style={[type.micro, { marginTop: 6, color: colors.faint }]}>
-                  Filed {relTime(p.filed_at)}
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-        </ScrollView>
-
-        {/* CTA */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
-          <Pressable
-            onPress={() => {
-              onClose();
-              router.push({
-                pathname: '/chat',
-                params: { ticker: alert.ticker, filing: String(alert.id) },
-              });
-            }}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.85 : 1,
-              backgroundColor: colors.accent,
-              borderRadius: radius.md,
-              paddingVertical: 13,
-              alignItems: 'center',
-            })}
-          >
-            <Text style={{ color: '#04130C', fontWeight: '700', fontSize: 14.5 }}>
-              Ask FINN about this filing
-            </Text>
-          </Pressable>
-        </View>
-      </View>
+    <View style={{ borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: '#000000', padding: 18 }}>
+      <Text style={type.h2}>You are done for this window.</Text>
+      <Text style={[type.body, { marginTop: 6, color: colors.muted }]}>
+        {decided
+          ? `${decided} decided: ${changes} changed the story, ${watch} to watch, ${decided - changes - watch} with no impact.`
+          : 'No filing or price move crossed your lines in this window.'}
+      </Text>
+      <Text style={[type.micro, { marginTop: 10 }]}>
+        Pick a longer window above to look further back, or ask FINN about any company.
+      </Text>
     </View>
   );
+}
+
+/** Horizontal swipe on the focus card with a tap fallback in the verdict bar. */
+function Swipe({ children, onLeft, onRight }: { children: React.ReactNode; onLeft: () => void; onRight: () => void }) {
+  const x = useRef(new Animated.Value(0)).current;
+  const responder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderMove: (_, g) => x.setValue(g.dx),
+      onPanResponderRelease: (_, g) => {
+        if (g.dx < -110) {
+          Animated.timing(x, { toValue: -500, duration: 160, useNativeDriver: true }).start(onLeft);
+        } else if (g.dx > 110) {
+          Animated.timing(x, { toValue: 500, duration: 160, useNativeDriver: true }).start(onRight);
+        } else {
+          Animated.spring(x, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+      onPanResponderTerminate: () => Animated.spring(x, { toValue: 0, useNativeDriver: true }).start(),
+    }),
+  ).current;
+  const rotate = x.interpolate({ inputRange: [-300, 0, 300], outputRange: ['-4deg', '0deg', '4deg'] });
+  return (
+    <Animated.View {...responder.panHandlers} style={{ transform: [{ translateX: x }, { rotate }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** A short spoken version of the brief for the commute. */
+function spokenBrief(brief: Brief): string {
+  const items = brief.material;
+  if (!items.length) {
+    return `Nothing needs a decision in this window. ${brief.routine_count} routine filings were hidden.`;
+  }
+  const lines = items.slice(0, 6).map((i, n) => {
+    const p = i.payload as Partial<AnnouncementPayload>;
+    const facts = p.facts?.rows
+      ?.filter((r) => r.label === 'Revenue' || r.label === 'PAT')
+      .filter((r) => r.yoy_pct != null)
+      .map((r) => `${r.label === 'PAT' ? 'profit' : 'revenue'} ${r.yoy_pct! >= 0 ? 'up' : 'down'} ${Math.abs(r.yoy_pct!).toFixed(0)} percent on the year`)
+      .join(', ');
+    return `${n === 0 ? 'First' : 'Next'}, ${i.ticker}. ${headlineOf(i)}.${facts ? ` ${facts}.` : ''} This bears on ${i.touches}.`;
+  });
+  const more = items.length > 6 ? ` And ${items.length - 6} more in the app.` : '';
+  return `${items.length} items need a decision. ${lines.join(' ')}${more} ${brief.routine_count} routine filings were hidden.`;
 }

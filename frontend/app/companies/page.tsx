@@ -36,17 +36,17 @@ export default function CompaniesPage() {
   };
 
   return (
-    <main className="pb-[92px]">
+    <main className="pb-[calc(var(--tabbar-h)+var(--safe-bottom)+24px)]">
       <Header />
 
-      <div className="space-y-5 px-4 pt-3">
-        <section className="card p-4" aria-labelledby="ticker-search-title">
-          <h1 id="ticker-search-title" className="text-[15px] font-bold text-[#000000]">Research a company</h1>
-          <p className="mt-1 max-w-[65ch] text-[12.5px] leading-relaxed text-[#4B5563]">
-            Enter an NSE or BSE ticker. FINN loads a quote when the symbol is listed, and it refuses company analysis when primary documents are missing.
+      <div className="space-y-7 px-4 pt-4">
+        <section aria-labelledby="ticker-search-title">
+          <h1 id="ticker-search-title" className="display text-[22px] leading-tight">Open any listed company</h1>
+          <p className="mt-1 max-w-[65ch] text-[14px] leading-relaxed text-[#4B5563]">
+            Enter an NSE or BSE symbol. For a company FINN has not read, it fetches the newest calls and grades management&apos;s promises, or says plainly that primary sources do not cover it.
           </p>
           <form className="mt-3" onSubmit={openResearch} noValidate>
-            <label htmlFor="ticker-search" className="text-[12px] font-semibold text-[#000000]">
+            <label htmlFor="ticker-search" className="text-[13px] font-semibold text-[#000000]">
               Ticker symbol
             </label>
             <div className="mt-1.5 flex gap-2">
@@ -65,23 +65,23 @@ export default function CompaniesPage() {
                 list="tracked-tickers"
                 aria-describedby={validation ? "ticker-error" : "ticker-hint"}
                 aria-invalid={Boolean(validation)}
-                className="min-h-11 min-w-0 flex-1 rounded-none border border-[#000000]/30 px-3 text-[16px] font-semibold uppercase tracking-wide placeholder:font-normal placeholder:tracking-normal placeholder:text-[#4B5563]"
-                placeholder="e.g. PERSISTENT"
+                className="field min-w-0 flex-1 font-semibold uppercase tracking-wide placeholder:font-normal placeholder:normal-case placeholder:tracking-normal"
+                placeholder="e.g. DIXON"
               />
               <datalist id="tracked-tickers">
                 {rows.map((row) => <option key={row.ticker} value={row.ticker} />)}
               </datalist>
               <button
                 type="submit"
-                className="press min-h-11 shrink-0 rounded-none bg-black px-4 text-[12px] font-semibold text-white hover:bg-[#1F2937]"
+                className="btn btn-primary shrink-0"
               >
-                Open research
+                Open
               </button>
             </div>
             {validation ? (
-              <p id="ticker-error" role="alert" className="mt-1.5 text-[12px] font-medium text-[#B4442C]">{validation}</p>
+              <p id="ticker-error" role="alert" className="mt-1.5 text-[13px] font-semibold text-black">{validation}</p>
             ) : (
-              <p id="ticker-hint" className="mt-1.5 text-[11.5px] text-[#4B5563]">You can also choose a tracked ticker below.</p>
+              <p id="ticker-hint" className="mt-1.5 text-[13px] text-[#4B5563]">Or pick one of your holdings below.</p>
             )}
           </form>
         </section>
@@ -99,8 +99,8 @@ export default function CompaniesPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            {portfolioCount > 0 && <Section label="Portfolio" count={portfolioCount} rows={data!.portfolio} />}
-            {adhocCount > 0 && <Section label="Ad-hoc research" count={adhocCount} rows={data!.adhoc} />}
+            {portfolioCount > 0 && <Section label="Your portfolio" count={portfolioCount} rows={data!.portfolio} />}
+            {adhocCount > 0 && <Section label="Also opened" count={adhocCount} rows={data!.adhoc} />}
           </div>
         )}
       </div>
@@ -112,25 +112,25 @@ function Section({ label, count, rows }: { label: string; count: number; rows: T
   return (
     <section aria-label={label}>
       <div className="mb-2 flex items-baseline justify-between px-0.5">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4B5563]">{label}</h2>
-        <span className="num text-[11px] text-[#4B5563]">{count}</span>
+        <h2 className="label">{label}</h2>
+        <span className="num text-[12px] text-[#4B5563]">{count}</span>
       </div>
-      <div className="card overflow-hidden">
-        {rows.map((q, i) => (
+      <div className="border-b border-[#E5E7EB]">
+        {rows.map((q) => (
           <Link
             key={q.ticker}
             href={`/company/${encodeURIComponent(q.ticker)}`}
-            className={`press flex min-h-11 items-center gap-3 px-3.5 py-3 ${i > 0 ? "border-t border-[#000000]/[0.08]" : ""}`}
+            className="flex min-h-12 items-center gap-3 border-t border-[#E5E7EB] py-2.5 hover:bg-black/[0.02]"
           >
-            <span className="num min-w-0 flex-1 truncate text-[13.5px] font-bold tracking-wide text-[#000000]">{q.ticker}</span>
-            <span className="num shrink-0 text-[12px] font-medium text-[#4B5563]">{rupees(q.close)}</span>
+            <span className="num min-w-0 flex-1 truncate text-[15px] font-bold tracking-[0.02em] text-[#000000]">{q.ticker}</span>
+            <span className="num shrink-0 text-[14px] text-[#4B5563]">{rupees(q.close)}</span>
             <span
-              className="num min-w-[54px] shrink-0 rounded-none px-1.5 py-0.5 text-center text-[11.5px] font-semibold"
+              className="num min-w-[64px] shrink-0 text-right text-[14px] font-semibold"
               style={changeStyle(q.change_pct)}
             >
               {pct(q.change_pct)}
             </span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="#808080" strokeWidth={2} className="ml-auto h-4 w-4" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#808080" strokeWidth={2} className="h-4 w-4 shrink-0" aria-hidden="true">
               <path d="m9 5 7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </Link>
@@ -143,7 +143,6 @@ function Section({ label, count, rows }: { label: string; count: number; rows: T
 function changeStyle(v: number | null): React.CSSProperties {
   const t = toneFor(v);
   return {
-    background: t === "pos" ? "rgba(16,185,129,0.12)" : t === "neg" ? "rgba(244,63,94,0.12)" : "rgba(139,147,163,0.12)",
     color: t === "pos" ? "#1E6B4F" : t === "neg" ? "#B4442C" : "#4B5563",
   };
 }

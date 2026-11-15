@@ -2,16 +2,22 @@
 // Always relative paths — Next rewrites proxy /api/* to the FastAPI backend.
 
 import type {
+  Alert,
+  Brief,
   ChatEvent,
   CompaniesResponse,
   CompanyResponse,
   CostsResponse,
+  CoverageResponse,
   DemoRunResponse,
-  DigestResponse,
-  FeedResponse,
+  Ledger,
   Settings,
   SourceInfo,
   SourceMap,
+  Verdict,
+  VerdictLogRow,
+  VerdictResult,
+  Watchpoint,
 } from "./types";
 
 export class ApiError extends Error {
@@ -44,12 +50,11 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+function post<T>(path: string, body: unknown): Promise<T> {
+  return jsonFetch<T>(path, { method: "POST", body: JSON.stringify(body) });
+}
+
 export const api = {
-  feed: (hours: number, includeRead = false, signal?: AbortSignal) =>
-    jsonFetch<FeedResponse>(`/api/feed?hours=${hours}&include_read=${includeRead}`, { signal }),
-
-  digestLatest: (signal?: AbortSignal) => jsonFetch<DigestResponse>(`/api/digest/latest`, { signal }),
-
   company: (ticker: string, signal?: AbortSignal) =>
     jsonFetch<CompanyResponse>(`/api/company/${encodeURIComponent(ticker)}`, { signal }),
 
@@ -77,8 +82,43 @@ export const api = {
       signal,
     }),
 
+  brief: (hours: number, signal?: AbortSignal) => jsonFetch<Brief>(`/api/brief?hours=${hours}`, { signal }),
+
+  briefSeen: () => post<{ last_look: string }>(`/api/brief/seen`, {}),
+
+  verdict: (alertId: number, verdict: Verdict, opts: { muteCategory?: boolean; note?: string } = {}) =>
+    post<VerdictResult>(`/api/alerts/${alertId}/verdict`, {
+      verdict,
+      mute_category: Boolean(opts.muteCategory),
+      note: opts.note ?? "",
+    }),
+
+  verdicts: (signal?: AbortSignal) => jsonFetch<{ verdicts: VerdictLogRow[] }>(`/api/verdicts`, { signal }),
+
+  alert: (alertId: number, signal?: AbortSignal) => jsonFetch<Alert>(`/api/alerts/${alertId}`, { signal }),
+
+  ledger: (ticker: string, signal?: AbortSignal) =>
+    jsonFetch<Ledger>(`/api/company/${encodeURIComponent(ticker)}/ledger`, { signal }),
+
+  coverage: (ticker: string, signal?: AbortSignal) =>
+    jsonFetch<CoverageResponse>(`/api/company/${encodeURIComponent(ticker)}/coverage`, { signal }),
+
+  watchpoints: (ticker: string, signal?: AbortSignal) =>
+    jsonFetch<{ watchpoints: Watchpoint[] }>(`/api/company/${encodeURIComponent(ticker)}/watchpoints`, { signal }),
+
+  addWatchpoint: (ticker: string, text: string) =>
+    post<Watchpoint>(`/api/company/${encodeURIComponent(ticker)}/watchpoints`, { text }),
+
+  deleteWatchpoint: (ticker: string, id: number) =>
+    jsonFetch<{ ok: boolean }>(`/api/company/${encodeURIComponent(ticker)}/watchpoints/${id}`, { method: "DELETE" }),
+
+  watch: (ticker: string) => post<{ watchlist: string[] }>(`/api/watchlist`, { ticker }),
+
+  unwatch: (ticker: string) =>
+    jsonFetch<{ watchlist: string[] }>(`/api/watchlist/${encodeURIComponent(ticker)}`, { method: "DELETE" }),
+
   chatStream: async function* (
-    body: { message: string; session_id?: string; ticker?: string; filing_id?: string },
+    body: { message: string; session_id?: string; ticker?: string; filing_id?: number },
     signal: AbortSignal
   ): AsyncGenerator<ChatEvent> {
     const res = await fetch(`/api/chat`, {

@@ -42,7 +42,7 @@ def test_companies_shape(client):
 
 
 def test_untracked_company_degrades_gracefully(client, monkeypatch):
-    async def no_network(_ticker):
+    async def no_network(_ticker, **_kwargs):
         return None
 
     monkeypatch.setattr("finn.api.main._hydrate_company", no_network)
@@ -57,7 +57,11 @@ def test_company_rejects_malformed_ticker(client):
     assert r.status_code == 400
 
 
-def test_company_shape(client):
+def test_company_shape(client, monkeypatch):
+    async def no_network(_ticker, **_kwargs):
+        return None
+
+    monkeypatch.setattr("finn.api.main._hydrate_company", no_network)
     r = client.get("/api/company/PERSISTENT")
     assert r.status_code == 200
     d = r.json()

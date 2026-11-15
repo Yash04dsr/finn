@@ -32,13 +32,15 @@ QUARTER_HEADERS = ["Revenue", "EBITDA", "PBT", "PAT"]
 
 def scrape_quarterly(ticker: str) -> list[dict] | None:
     """Scrape the quarterly results table from Screener. Returns rows or None on failure."""
-    url = f"https://www.screener.in/company/{ticker}/consolidated/"
+    from .discovery import company_page
+
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=10)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        table = soup.find("section", id="quarters-section")
-        if not table:
+        html = company_page(ticker)
+        if not html:
+            return None
+        soup = BeautifulSoup(html, "html.parser")
+        table = soup.find("section", id="quarters") or soup.find("section", id="quarters-section")
+        if not table or not table.find("table"):
             return None
         table = table.find("table")
         heads = [th.get_text(strip=True) for th in table.find_all("th")]
@@ -48,15 +50,17 @@ def scrape_quarterly(ticker: str) -> list[dict] | None:
             cells = [td.get_text(strip=True) for td in tr.find_all("td")]
             if not cells:
                 continue
-            label = cells[0]
+            label = cells[0].rstrip("+").strip().lower()
             nums = [_parse_num(c) for c in cells[1:]]
-            if label in ("Sales", "Revenue"):
+            if label in ("sales", "revenue") and "revenue" not in data:
                 data["revenue"] = nums
-            elif label.startswith("Operating profit"):
+            elif label in ("operating profit", "financing profit") and "ebitda" not in data:
                 data["ebitda"] = nums
-            elif label.startswith("Profit before tax"):
+            elif label.startswith("profit before tax"):
                 data["pbt"] = nums
-            elif label in ("Net profit", "Profit after tax"):
+            elif label == "depreciation":
+                data["depreciation"] = nums
+            elif label in ("net profit", "profit after tax"):
                 data["pat"] = nums
         if "revenue" not in data:
             return None
@@ -75,6 +79,7 @@ def scrape_quarterly(ticker: str) -> list[dict] | None:
                 "ebitda": col("ebitda"),
                 "pbt": col("pbt"),
                 "pat": col("pat"),
+                "depreciation": col("depreciation"),
                 "source": "screener",
             })
         rows = [row for row in rows if row["period_end"]]
@@ -173,6 +178,13 @@ def ingest_quarterly(ticker: str) -> str:
         for row in rows:
             row["source"] = provenance
     if rows:
+        if mode == "live":
+            # Live numbers replace every illustrative row, so the two never mix in one series.
+            with db.db() as c:
+                c.execute("DELETE FROM quarterly WHERE ticker=? AND source='illustrative_snapshot'",
+                          (ticker,))
+        elif any(r.get("source") == "screener_live" for r in db.quarterly_series(ticker, limit=1)):
+            return "kept_live"
         db.put_quarterly(ticker, rows)
     return mode if rows else "none"
 

@@ -4,7 +4,6 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import Constants from 'expo-constants';
 
@@ -15,9 +14,11 @@ import {
   registerForPushNotifications,
 } from '../../../lib/notifications';
 import { colors, radius, type } from '../../../lib/theme';
-import type { Costs, Settings as SettingsT } from '../../../lib/types';
+import type { Costs, Settings as SettingsT, VerdictLogRow } from '../../../lib/types';
 import { DEFAULT_BASE_URL, loadBaseUrl, saveBaseUrl } from '../../../lib/store';
-import { fmtTokens, isValidHHMM } from '../../../lib/format';
+import { fmtTokens, isValidHHMM, relTime } from '../../../lib/format';
+import { Wordmark } from '../../../components/Wordmark';
+import { VERDICT_LABEL } from '../../../components/brief';
 import { ErrorCard, SectionHeader, Skeleton, Spinner } from '../../../components/ui';
 
 const CATEGORIES = [
@@ -41,8 +42,6 @@ const CATEGORIES = [
 ];
 
 export default function SettingsScreen() {
-  const insets = useSafeAreaInsets();
-
   // backend url
   const [urlDraft, setUrlDraft] = useState(DEFAULT_BASE_URL);
   const [activeUrl, setActiveUrl] = useState(DEFAULT_BASE_URL);
@@ -59,6 +58,9 @@ export default function SettingsScreen() {
 
   // demo
   const [demoState, setDemoState] = useState<'idle' | 'working'>('idle');
+
+  // decisions
+  const [verdicts, setVerdicts] = useState<VerdictLogRow[]>([]);
 
   // costs
   const [costs, setCosts] = useState<Costs | null>(null);
@@ -89,9 +91,14 @@ export default function SettingsScreen() {
   const loadServerState = useCallback(async () => {
     setSettingsErr(null);
     try {
-      const [s, c] = await Promise.all([api.getSettings(), api.costs().catch(() => null)]);
+      const [s, c, v] = await Promise.all([
+        api.getSettings(),
+        api.costs().catch(() => null),
+        api.verdicts().catch(() => null),
+      ]);
       setSettings(s);
       if (c) setCosts(c);
+      if (v) setVerdicts(v.verdicts);
     } catch (e) {
       setSettingsErr(e instanceof ApiError ? e.message : 'Network request failed');
     }
@@ -113,14 +120,15 @@ export default function SettingsScreen() {
     }, 700);
   };
 
-  const pushSettings = useCallback(async (next: SettingsT) => {
+  const pushSettings = useCallback(async (next: SettingsT, previous: SettingsT | null) => {
     setSettings(next); // optimistic
     setSavingSettings(true);
     try {
       const saved = await api.saveSettings(next);
       setSettings(saved);
     } catch {
-      // keep optimistic value; reload on next visit
+      setSettings(previous);
+      Alert.alert('Not saved', 'FINN could not save that change. Check the connection and try again.');
     } finally {
       setSavingSettings(false);
     }
@@ -173,7 +181,7 @@ export default function SettingsScreen() {
 
   const patchSettings = (patch: Partial<SettingsT>) => {
     if (!settings) return;
-    void pushSettings({ ...settings, ...patch });
+    void pushSettings({ ...settings, ...patch }, settings);
   };
 
   const toggleCategory = (cat: string) => {
@@ -188,46 +196,8 @@ export default function SettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 16, paddingBottom: 120, gap: 22 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-          <Text style={type.title}>Settings</Text>
-          {savingSettings ? <Spinner size={13} /> : null}
-        </View>
-
-        {/* ---- Backend ---- */}
-        <View>
-          <SectionHeader title="Backend" hint={urlSaved ? 'saved ✓' : undefined} />
-          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 13, gap: 8 }}>
-            <Text style={type.micro}>API base URL</Text>
-            <TextInput
-              value={urlDraft}
-              onChangeText={(t) => {
-                setUrlDraft(t);
-                commitUrl(t);
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              placeholder="http://192.168.1.20:8000"
-              placeholderTextColor={colors.faint}
-              style={{
-                backgroundColor: colors.surface2,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radius.sm,
-                paddingHorizontal: 11,
-                paddingVertical: 9,
-                color: colors.text,
-                fontSize: 13.5,
-                fontVariant: ['tabular-nums'],
-              }}
-            />
-            <Text style={[type.micro, { color: colors.faint, lineHeight: 16 }]}>
-              Active: {activeUrl}
-              {lanIp ? `\nOn device, use your Mac's LAN IP — likely http://${lanIp}:8000` : ''}
-            </Text>
-          </View>
-        </View>
+      <Wordmark trailing={savingSettings ? <Spinner size={13} /> : null} />
+      <ScrollView contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: 120, gap: 22 }}>
 
         {/* ---- Alerts ---- */}
         <View>
@@ -235,7 +205,7 @@ export default function SettingsScreen() {
           {settingsErr && !settings ? (
             <ErrorCard message={settingsErr} hint={`Backend: ${getBaseUrl()}`} />
           ) : !settings ? (
-            <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 12 }}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: '#000000', padding: 14, gap: 12 }}>
               <Skeleton h={14} w="60%" />
               <Skeleton h={34} />
               <Skeleton h={14} w="50%" />
@@ -243,7 +213,7 @@ export default function SettingsScreen() {
               <Skeleton h={30} w="80%" />
             </View>
           ) : (
-            <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 16 }}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: '#000000', padding: 14, gap: 16 }}>
               {/* volume slider */}
               <View>
                 <Text style={[type.h3, { fontSize: 13.5, marginBottom: 2 }]}>
@@ -301,18 +271,21 @@ export default function SettingsScreen() {
                         style={({ pressed }) => ({
                           opacity: pressed ? 0.7 : 1,
                           paddingHorizontal: 11,
-                          paddingVertical: 6,
-                          borderRadius: 999,
+                          minHeight: 44,
+                          justifyContent: 'center',
+                          borderRadius: 0,
                           borderWidth: 1,
-                          borderColor: on ? colors.accent : colors.borderStrong,
-                          backgroundColor: on ? colors.accentDim : 'transparent',
+                          borderColor: on ? '#000000' : 'rgba(0,0,0,0.25)',
+                          backgroundColor: on ? '#000000' : '#FFFFFF',
                         })}
                       >
                         <Text
                           style={{
                             fontSize: 12,
                             fontWeight: '600',
-                            color: on ? colors.accent : colors.muted,
+                            color: on ? '#FFFFFF' : colors.muted,
+                            letterSpacing: 0.7,
+                            textTransform: 'uppercase',
                           }}
                         >
                           {cat}
@@ -345,7 +318,7 @@ export default function SettingsScreen() {
         {/* ---- Push ---- */}
         <View>
           <SectionHeader title="Push" />
-          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 10 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: '#000000', padding: 14, gap: 10 }}>
             <PrimaryButton
               label={
                 pushState === 'working'
@@ -368,18 +341,40 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* ---- Decisions ---- */}
+        <View>
+          <SectionHeader title="Your decisions" hint={verdicts.length ? `${verdicts.length}` : undefined} />
+          {verdicts.length ? (
+            verdicts.slice(0, 12).map((v) => (
+              <View key={v.alert_id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.small, { color: colors.text }]} numberOfLines={1}>{v.ticker} · {v.headline}</Text>
+                  <Text style={type.micro}>{relTime(v.created_at)}</Text>
+                </View>
+                <Text style={[type.micro, { color: '#000000', fontWeight: '700' }]}>{VERDICT_LABEL[v.verdict]}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={type.small}>Verdicts you give in the brief are kept here with their dates, so you can see what you concluded and when.</Text>
+          )}
+        </View>
+
+        <Text style={[type.micro, { marginTop: 8, borderTopWidth: 2, borderTopColor: '#000000', paddingTop: 10 }]}>
+          DEMO AND DIAGNOSTICS
+        </Text>
+
         {/* ---- Ops ---- */}
         <View>
-          <SectionHeader title="Ops" />
-          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 10 }}>
+          <SectionHeader title="Sample day" />
+          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: '#000000', padding: 14, gap: 10 }}>
             <PrimaryButton
-              label={demoState === 'working' ? 'Running pipeline…' : 'Run demo pipeline'}
+              label={demoState === 'working' ? 'Loading the sample day…' : 'Load the sample day'}
               onPress={runDemo}
               disabled={demoState === 'working'}
               kind="ghost"
             />
             <Text style={[type.micro, { color: colors.faint, lineHeight: 16 }]}>
-              Re-runs ingest → classify → enrich → digest. Safe to run repeatedly.
+              Loads a labelled sample day of portfolio filings and refreshes prices and quarterly numbers. Running it again refreshes the same items.
             </Text>
           </View>
         </View>
@@ -388,7 +383,7 @@ export default function SettingsScreen() {
         <View>
           <SectionHeader title="Token usage" hint={costs ? `${fmtTokens(costs.total_tokens)} total` : undefined} />
           {costs ? (
-            <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 12 }}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: '#000000', padding: 14, gap: 12 }}>
               <Text style={[type.micro, { color: colors.faint, lineHeight: 16 }]}>
                 Provider-reported tokens by routing tier. This is usage telemetry, not billed cost.
               </Text>
@@ -433,19 +428,54 @@ export default function SettingsScreen() {
               </View>
 
               <Text style={[type.micro, { color: colors.faint, fontStyle: 'italic' }]}>
-                Smart routing: fast tier for bulk work, reasoning tier for analysis.
+                Fast model for classification, extraction and short summaries. Reasoning model only for research answers.
               </Text>
             </View>
           ) : costsErr ? (
             <ErrorCard message={costsErr} />
           ) : (
-            <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 10 }}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: '#000000', padding: 14, gap: 10 }}>
               <Skeleton h={12} w="40%" />
               <Skeleton h={10} />
               <Skeleton h={10} w="70%" />
             </View>
           )}
         </View>
+        {/* ---- Backend ---- */}
+        <View>
+          <SectionHeader title="Server address" hint={urlSaved ? 'saved ✓' : undefined} />
+          <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: '#000000', padding: 13, gap: 8 }}>
+            <Text style={type.micro}>API base URL</Text>
+            <TextInput
+              value={urlDraft}
+              onChangeText={(t) => {
+                setUrlDraft(t);
+                commitUrl(t);
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              placeholder="http://192.168.1.20:8000"
+              placeholderTextColor={colors.faint}
+              style={{
+                backgroundColor: colors.surface2,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radius.sm,
+                paddingHorizontal: 11,
+                paddingVertical: 9,
+                color: colors.text,
+                fontSize: 13.5,
+                fontVariant: ['tabular-nums'],
+              }}
+            />
+            <Text style={[type.micro, { color: colors.faint, lineHeight: 16 }]}>
+              Active: {activeUrl}
+              {lanIp ? `\nOn device, use your Mac's LAN IP — likely http://${lanIp}:8000` : ''}
+            </Text>
+          </View>
+        </View>
+
       </ScrollView>
     </View>
   );
@@ -483,7 +513,7 @@ function PrimaryButton({
     >
       <Text
         style={{
-          color: kind === 'accent' ? '#04130C' : colors.text,
+          color: kind === 'accent' ? '#FFFFFF' : colors.text,
           fontWeight: '700',
           fontSize: 14,
         }}

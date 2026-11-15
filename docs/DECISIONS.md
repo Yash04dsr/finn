@@ -1,78 +1,57 @@
-# DECISIONS.md — the calls we made, and the ones we didn't
+# Decisions: the calls we made, and the ones we did not
 
-The brief grades judgment, so here is the judgment in the open.
+**A brief you finish, graded against management's own words.**
 
-## What we deliberately built first
+The brief grades judgment, so the reasoning is here in the open.
 
-**One beautiful loop over many shallow ones.** The product is "the 24h brief + a
-grounded analyst you can interrogate". Every other idea was tested against whether it
-strengthened that loop.
+## Who it is for, and what follows from that
+
+The user is a portfolio manager at a lean, concentrated, long-horizon fund. They hold 15 to 20 companies they know well, and they protect the thesis for each. Three product beliefs follow:
+
+1. **Alerts are thesis checks.** An item says which watchpoint it touches. A routine filing is a count, not a card.
+2. **The brief has an end.** Success is a finished decision on each material item, not time in the app.
+3. **Management is analysed, not summarised.** Promised versus delivered, cited on both sides, is the company view.
 
 ## Key trade-offs
 
-### 1. Deterministic core, LLM at the edges
-Threshold alerts, priority ranking, digest composition, and all financial math are
-plain Python with unit tests. LLM calls are confined to language-shaped jobs:
-classifying ambiguous filings (batched), one-line summaries, exec bios, and grounded
-analysis. **Why:** an investor will forgive a dry summary; they will not forgive a
-wrong number or an alert that fires randomly. Determinism is a feature you can demo.
+### Web-first PWA (`frontend/`) over Expo (`mobile/`) as primary
+We initially built an Expo app (`mobile/`) for native phone testing, then made the Next.js PWA (`frontend/`, deployed on Vercel) the primary deliverable. A single Vercel URL works on phone and desktop with zero install and no tunnel drops. `mobile/` remains in the repo as an additional native client speaking the same API. The trade-off is that iOS Web Push requires **Add to Home Screen** in Safari (iOS 16.4+).
 
-### 2. Grounded-or-refuse, even when it feels blunt
-The analyst explicitly refuses when the corpus lacks coverage (tested in evals). A
-plusher product would fill gaps from model memory — that is exactly the "AI slop"
-failure mode. The refusal doubles as a product signal: it shows the user *where the
-grounded coverage ends*, and prompts them to ingest more documents.
+### Brief, verdict, dig in, instead of a feed or a chat box
+A feed asks the investor to do the filtering. A chat box makes them think of the question. The brief asks for one decision at a time and remembers it (with an optional one-line reason). Chat is the second layer, opened on the exact filing with questions written for that item.
 
-### 3. Hybrid classification instead of an LLM-everything pipeline
-Regex covers the taxonomy's clear cases at zero tokens; one batched call handles the
-ambiguous remainder. We gave up a little accuracy on odd phrasings to get
-deterministic latency, zero model-token usage on bulk, and a system that degrades gracefully when
-the LLM gateway is down.
+### Code decides; models read and write
+Numbers, `promise_check` (guided band vs. delivered), ranking, verdict grading in the ledger, routing, and citation checks are plain Python with tests. Models classify ambiguous filings, extract guidance, write short lines, and synthesise research. An investor forgives a dry sentence but not a wrong number.
 
-### 4. SQLite (+FTS5) over a vector database
-The corpus is small and lexical — BM25 over chunked filings returns precise,
-snippet-carrying hits with zero infrastructure. Chunking (paragraph-aware, 1.4k chars,
-150 overlap, repeated-header stripping) matters more than embedding magic at this
-scale. A vector index becomes worth it at ~10x corpus size; the retrieval interface
-(`search_docs`) is the seam where it would slot in.
+### Routing decided in code, not by the model
+Earlier, a fast "root" agent chose whether to hand a question to the grounded analyst. When it did not, the answer came from model memory and skipped the citation check. Now a company question always reaches the analyst, and the fast assistant only sees portfolio-wide questions.
 
-### 5. Two-tier routing kept even though one model is reachable today
-The gateway key currently permits a single model, so fast and reasoning tiers resolve
-identically by default. We kept explicit tier separation in config and telemetry because
-the *architecture* is the point — a stronger permitted model can be introduced without
-rewiring the pipeline. The UI reports tokens by tier, not an unsupported monetary cost.
+### Citations checked by the server
+A model can write `[S12]` without having read S12. The server keeps only IDs that a tool returned in the same turn and holds back research answers with none. It also sends structured sources the app can open.
 
-### 6. Expo app as the primary client, PWA as the fallback
-The graders should try FINN on a phone with zero friction: Expo Go scan → full native
-app (push notifications via Expo push, native sliders, native navigation). The Next.js
-PWA remains as a no-install web fallback sharing the same API.
+### Two tiers on one model
+The key permits one model (`hyde/glm-5.3-flash`). Rather than pretend, the fast tier turns the model's reasoning down (`reasoning_effort=low`): same answers on bulk jobs, about a ninth of the output tokens. The architecture accepts a second model per tier without code changes (`FINN_MODEL_FAST`, `FINN_MODEL_REASONING`).
 
-## What we deliberately left out (and why)
+### Executive background from the filing, not LinkedIn
+SEBI LODR requires an appointment filing to include a brief profile of the appointee, so FINN reads that profile. It is primary, citable, and does not break any site's terms. The annual report is the fallback. Scraping LinkedIn directly breaks its terms and gets blocked.
 
-- **Real LinkedIn scraping for exec bios** — ToS/anti-bot issues and brittle for a
-  demo; instead the bio enricher extracts what the filing itself says, structured.
-  The enrichment seam is real; plugging a licensed data provider is one function.
-- **News/broker commentary** — the brief explicitly demotes secondary data on the pull
-  side; primary-only is also what keeps the grounding contract enforceable.
-- **Vector embeddings / reranking** — premature at this corpus size (see trade-off 4).
-- **Full account management** — the challenge is a single investor's workflow. The
-  public demo still isolates chat sessions, restricts CORS and rate-limits costly or
-  mutable endpoints.
-- **Live intraday prices** — the brief scopes price data to EOD; intraday adds noise,
-  cost, and no new demonstrated capability.
-- **App-store submission** — the PWA is the zero-install grading path; a push-capable
-  Expo preview build needs an authenticated EAS project and is documented separately.
+### Sample day, clearly labelled
+A demo needs a busy day; a live Sunday has none. The sample day loads only when asked for, every item is labelled, and live filings never mix with it. Earlier builds re-dated fixtures as if they were live; that was removed.
 
-## Where we'd take it next
+### SQLite and BM25 over a vector database
+The corpus per company is small and lexical. BM25 with an any-word fallback returns precise, citable passages with no extra infrastructure.
 
-1. **Digest memory** — track what was already shown, diff consecutive digests ("2 new
-   since yesterday") so the brief reads like a feed, not a report.
-2. **Per-user learning on priorities** — promote/demote categories from read/skip
-   behaviour (the `why` strings already record the base logic).
-3. **Earnings-calendar awareness** — pre-results, surface the *expected* numbers so
-   the first-cut becomes expected-vs-actual, not just QoQ/YoY.
-4. **Prompt-injection hardening** — filings are untrusted text that the analyst reads;
-   strict tool-only grounding already limits blast radius, but content-level
-   instruction filtering would be next.
-5. **Voice pull** — a morning-commute mode: read the digest aloud, take follow-up
-   questions by voice (ADK + Expo audio APIs).
+## Deliberately left out
+
+- **Pre-results prep card**: a natural next step, cut so the core brief + promise check loop stays sharp.
+- Buy, sell, or hold calls and price targets.
+- News and broker notes on the research side.
+- A full thesis editor. Watchpoints are a short list, drafted from management's own promises.
+- Accounts and multi-user state. This is one investor's workflow.
+- Intraday prices.
+
+## Where it goes next
+
+1. Pre-results prep card ahead of scheduled earnings.
+2. A second model for the reasoning tier, then measure answer quality against cost per question.
+3. A weekly "kept versus missed" review across the whole portfolio from the ledger.

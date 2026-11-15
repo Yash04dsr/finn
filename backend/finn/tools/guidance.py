@@ -185,6 +185,8 @@ def scorecard(ticker: str) -> dict:
             "delivered_period": latest_period,
             **grade,
             "source": {
+                "source_id": f"S{c['chunk_id']}",
+                "doc_type": "transcript",
                 "chunk_id": c["chunk_id"],
                 "doc_title": c["doc_title"],
                 "period": c["period"],

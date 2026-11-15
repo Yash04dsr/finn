@@ -1,244 +1,351 @@
 "use client";
 
-import { use, useCallback, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { CompanyResponse } from "@/lib/types";
-import { fetchers, useApi } from "@/lib/useApi";
-import { pct, rupees, shortDate } from "@/lib/format";
+import type { CompanyResponse, Ledger, VerdictLogRow, Watchpoint } from "@/lib/types";
+import { api } from "@/lib/api";
+import { catLabel, pct, rupees, shortDate, toneFor } from "@/lib/format";
 import Header from "@/components/Header";
 import RevenueChart from "@/components/RevenueChart";
-import CategoryChip from "@/components/CategoryChip";
-import GuidanceScorecard from "@/components/GuidanceScorecard";
-import { ListSkeleton, ErrorRow } from "@/components/Skeleton";
-import { toneFor } from "@/lib/format";
+import StagedProgress, { type Stage } from "@/components/StagedProgress";
+import { ErrorRow, Skeleton } from "@/components/Skeleton";
+import { ArrowRight, SectionHeader } from "@/components/ui";
+import PromiseLedger from "@/components/company/PromiseLedger";
+import Watchpoints from "@/components/company/Watchpoints";
+import { VERDICT_LABEL } from "@/components/brief/model";
+
+const SOURCE_LABEL: Record<string, string> = {
+  illustrative_snapshot: "Illustrative numbers for the demo, not reported figures.",
+  screener_live: "Source: Screener.in quarterly table, compiled from exchange filings.",
+  screener: "Source: Screener.in quarterly table, compiled from exchange filings.",
+  results_filing: "Source: company results filings.",
+};
 
 export default function CompanyPage({ params }: { params: Promise<{ ticker: string }> }) {
   const { ticker: raw } = use(params);
-  const ticker = decodeURIComponent(raw);
-  const router = useRouter();
-  const { data, loading, error, notFound, reload } = useApi(
-    useCallback((signal: AbortSignal) => fetchers.company(ticker)(signal), [ticker]),
-    [ticker]
-  );
-  const [tab, setTab] = useState<"overview" | "filings">("overview");
-  const c = data as CompanyResponse | null;
+  const ticker = decodeURIComponent(raw).toUpperCase();
+
+  const [company, setCompany] = useState<CompanyResponse | null>(null);
+  const [companyError, setCompanyError] = useState(false);
+  const [ledger, setLedger] = useState<Ledger | null>(null);
+  const [ledgerState, setLedgerState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
+  const [points, setPoints] = useState<Watchpoint[]>([]);
+  const [decisions, setDecisions] = useState<VerdictLogRow[] | null>(null);
+  const [watching, setWatching] = useState(false);
+  const [watchError, setWatchError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  const loadLedger = useCallback(async () => {
+    setLedgerState("loading");
+    try {
+      const l = await api.ledger(ticker);
+      setLedger(l);
+      setPoints(l.watchpoints ?? []);
+      setLedgerState("ready");
+    } catch {
+      setLedgerState("failed");
+    }
+  }, [ticker]);
+
+  useEffect(() => {
+    let live = true;
+    setCompany(null);
+    setCompanyError(false);
+    api
+      .company(ticker)
+      .then((c) => {
+        if (!live) return;
+        setCompany(c);
+        setWatching(Boolean(c.watching));
+        const hasDocs = Boolean(c.coverage && (c.coverage.chunks.transcripts || c.coverage.chunks.annual_reports));
+        if (c.available !== false && (hasDocs || c.preparing?.state !== "running")) void loadLedger();
+      })
+      .catch(() => live && setCompanyError(true));
+    api
+      .verdicts()
+      .then((r) => live && setDecisions(r.verdicts.filter((v) => v.ticker === ticker)))
+      .catch(() => live && setDecisions([]));
+    return () => {
+      live = false;
+    };
+  }, [ticker, loadLedger, attempt]);
+
+  // While FINN fetches and reads newer transcripts, check back and grade once they land.
+  const preparing = company?.preparing?.state === "running";
+  useEffect(() => {
+    if (!preparing) return;
+    const t = window.setInterval(async () => {
+      try {
+        const c = await api.coverage(ticker);
+        setCompany((d) => (d ? { ...d, coverage: c.coverage, preparing: c.preparing } : d));
+        if (c.preparing?.state !== "running") {
+          window.clearInterval(t);
+          void loadLedger();
+        }
+      } catch {
+        /* keep polling quietly */
+      }
+    }, 3000);
+    return () => window.clearInterval(t);
+  }, [preparing, ticker, loadLedger]);
+
+  const toggleWatch = async () => {
+    const next = !watching;
+    setWatching(next);
+    setWatchError(false);
+    try {
+      await (next ? api.watch(ticker) : api.unwatch(ticker));
+    } catch {
+      setWatching(!next);
+      setWatchError(true);
+    }
+  };
+
+  const available = company && company.available !== false;
+  const cover = company?.coverage;
+  const noDocs = cover && cover.chunks.transcripts === 0 && cover.chunks.annual_reports === 0;
+  const prepFailed = company?.preparing?.state === "failed";
+  const illustrative = company?.quarterly.some((q) => q.source === "illustrative_snapshot");
 
   return (
-    <main className="pb-[92px]">
-      <Header />
-
-      {/* Back row */}
-      <div className="flex items-center px-4 pt-3">
-        <button
-          onClick={() => router.push("/companies")}
-          className="press -ml-2 flex min-h-11 items-center gap-1 rounded-none px-2 py-1 text-[13px] font-medium text-[#4B5563]"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden="true">
-            <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Companies
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="px-4 pt-4">
-          <ListSkeleton rows={3} />
-        </div>
-      ) : notFound || c?.available === false ? (
-        <UnavailableCompany ticker={ticker} />
-      ) : error || !c ? (
-        <div className="px-4 pt-4">
-          <ErrorRow message={`Couldn't load ${ticker} research. Check your connection and try again.`} onRetry={reload} />
-        </div>
-      ) : (
-        <>
-          {/* Ticker header */}
-          <div className="px-4 pt-2">
-            <div className="flex items-center gap-2.5">
-              <span className="num rounded-none bg-[#000000]/[0.06] px-2 py-1 text-[15px] font-bold tracking-wide">{c.ticker}</span>
-              {c.snapshot ? (
-                <div>
-                  <span className="num block text-[20px] font-bold leading-none tabular-nums">{rupees(c.snapshot.close)}</span>
-                  <span
-                    className="num text-[12px] font-semibold"
-                    style={{ color: toneFor(c.snapshot.change_pct) === "pos" ? "#1E6B4F" : toneFor(c.snapshot.change_pct) === "neg" ? "#B4442C" : "#4B5563" }}
-                  >
-                    {pct(c.snapshot.change_pct)} · {shortDate(c.snapshot.date)}
-                  </span>
-                </div>
+    <main className="pb-[calc(var(--tabbar-h)+var(--safe-bottom)+32px)]">
+      <Header
+        back={{ href: "/companies", label: "Companies" }}
+        right={
+          available ? (
+            <button
+              type="button"
+              onClick={() => void toggleWatch()}
+              aria-pressed={watching}
+              className={`btn min-h-11 px-3 ${watching ? "btn-primary" : "btn-secondary"}`}
+            >
+              {watching ? (
+                <>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5" aria-hidden="true">
+                    <path d="M4.5 12.5l5 5L20 7" strokeLinecap="square" />
+                  </svg>
+                  In your brief
+                </>
               ) : (
-                <p className="text-[12.5px] font-medium text-[#4B5563]">Latest price unavailable</p>
+                "Add to brief"
               )}
-            </div>
+            </button>
+          ) : null
+        }
+      />
 
-            {/* Grounded docs badges */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <DocBadge label="transcripts" n={c.chunk_stats?.transcripts} />
-              <DocBadge label="annual reports" n={c.chunk_stats?.annual_reports} />
-              <DocBadge label="results filings" n={c.chunk_stats?.results} />
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="mt-4 flex gap-1 px-4" role="tablist">
-            {(["overview", "filings"] as const).map((t) => (
-              <button
-                key={t}
-                id={`company-tab-${t}`}
-                role="tab"
-                aria-selected={tab === t}
-                aria-controls={`company-panel-${t}`}
-                onClick={() => setTab(t)}
-                className="press min-h-11 px-3.5 py-1.5 text-[12px] font-semibold capitalize transition-colors"
-                style={
-                  tab === t
-                    ? { background: "#000000", color: "#FFFFFF" }
-                    : { color: "#4B5563" }
-                }
+      <div className="space-y-8 px-4 pt-4">
+        {companyError ? (
+          <ErrorRow message={`FINN could not load ${ticker}. Check the connection and try again.`} onRetry={() => setAttempt((n) => n + 1)} />
+        ) : !company ? (
+          <ColdStart ticker={ticker} />
+        ) : company.available === false ? (
+          <NotCovered ticker={ticker} />
+        ) : (
+          <>
+            <section>
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h1 className="display num text-[30px] leading-none">{ticker}</h1>
+                {company.snapshot ? (
+                  <p className="num text-[16px] font-semibold">
+                    {rupees(company.snapshot.close)}{" "}
+                    <span style={{ color: toneColor(company.snapshot.change_pct) }}>{pct(company.snapshot.change_pct)}</span>
+                  </p>
+                ) : null}
+              </div>
+              <p className="num mt-1.5 text-[13px] text-[#4B5563]">
+                {company.snapshot ? `Close on ${shortDate(company.snapshot.date)}. ` : "No recent quote. "}
+                {cover ? coverageText(company) : null}
+              </p>
+              {watchError ? <p className="mt-1 text-[13px] font-semibold">Could not change your brief. Try again.</p> : null}
+              <Link
+                href={`/chat?ticker=${encodeURIComponent(ticker)}&q=${encodeURIComponent(`Did ${ticker} deliver what management promised?`)}`}
+                className="btn btn-secondary mt-3 w-full justify-between"
               >
-                {t}
-              </button>
-            ))}
-          </div>
+                Ask about {ticker}
+                <ArrowRight />
+              </Link>
+            </section>
 
-          <div
-            id={`company-panel-${tab}`}
-            role="tabpanel"
-            aria-labelledby={`company-tab-${tab}`}
-            className="space-y-3 px-4 pt-3.5"
-          >
-            {tab === "overview" ? (
-              <>
-                <div className="card p-4">
-                  <div className="mb-2 flex items-baseline justify-between">
-                    <h2 className="text-[12.5px] font-semibold text-[#000000]">Quarterly revenue · EBITDA margin</h2>
-                    <span className="text-[10.5px] text-[#4B5563]">last 8 quarters</span>
-                  </div>
-                  <RevenueChart quarterly={c.quarterly} />
-                  {c.quarterly.some((row) => row.source === "illustrative_snapshot") && (
-                    <p className="mt-3 border-t border-[#E5E7EB] pt-2 text-[10.5px] leading-relaxed text-[#4B5563]">
-                      Chart includes labelled illustrative fallback values where live fundamentals were unavailable.
-                    </p>
-                  )}
-                </div>
-                {c.portfolio_context?.revenue_yoy != null && c.portfolio_context?.portfolio_median_yoy != null && (
-                  <PortfolioContext
-                    yoy={c.portfolio_context.revenue_yoy}
-                    median={c.portfolio_context.portfolio_median_yoy}
-                  />
-                )}
-                {c.guidance_scorecard && c.guidance_scorecard.claims.length > 0 && (
-                  <GuidanceScorecard data={c.guidance_scorecard} />
-                )}
-              </>
+            {preparing && noDocs ? (
+              <section className="card p-4" aria-label="Preparing research">
+                <h2 className="text-[15px] font-bold">Reading {ticker}&apos;s primary documents</h2>
+                <p className="mb-3 mt-0.5 text-[13px] text-[#4B5563]">First time for this company. This usually takes under a minute.</p>
+                <StagedProgress stages={prepStages(company.preparing?.message ?? "", "running")} />
+              </section>
+            ) : ledgerState === "loading" && !ledger ? (
+              <section className="card p-4" aria-label="Grading promises">
+                <StagedProgress
+                  stages={[
+                    { label: "Finding call transcripts and annual report", state: "done" },
+                    { label: "Reading the calls", state: "done" },
+                    { label: "Grading promises against reported numbers", state: "active" },
+                  ]}
+                />
+              </section>
+            ) : noDocs && (prepFailed || ledgerState === "ready") && !ledger?.rows.length ? (
+              <section className="card p-4">
+                <h2 className="text-[16px] font-bold">Not covered by primary sources yet</h2>
+                <p className="mt-1.5 text-[14px] leading-relaxed text-[#4B5563]">
+                  FINN found no call transcripts or annual report for {ticker}, so it cannot grade management&apos;s promises.
+                  Research answers will say so rather than guess. The reported numbers below still come from filings.
+                </p>
+              </section>
+            ) : ledgerState === "failed" ? (
+              <ErrorRow message="The promise ledger could not be built right now." onRetry={() => void loadLedger()} />
             ) : (
-              <FilingsList filings={c.filings} />
+              <PromiseLedger ledger={ledger} fallback={company.guidance_scorecard} />
             )}
-          </div>
 
-          {/* Fixed research CTA */}
-          <div className="fixed inset-x-0 bottom-[64px] z-30 border-t border-[#000000]/[0.12] bg-[#FFFFFF]/92 px-4 backdrop-blur-md" style={{ paddingBottom: "8px", paddingTop: "10px" }}>
-            <div className="mx-auto w-full max-w-[480px]">
-              <button
-                onClick={() => router.push(`/chat?ticker=${encodeURIComponent(ticker)}`)}
-                className="press flex min-h-11 w-full items-center justify-center gap-2 rounded-none bg-black px-3 py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-[#1F2937]"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4" aria-hidden="true">
-                  <path d="M12 2.5l1.9 5.1a2 2 0 0 0 1.2 1.2l5.1 1.9-5.1 1.9a2 2 0 0 0-1.2 1.2L12 18.9l-1.9-5.1a2 2 0 0 0-1.2-1.2L3.8 10.7l5.1-1.9a2 2 0 0 0 1.2-1.2L12 2.5Z" />
-                </svg>
-                Research {ticker} with FINN
-              </button>
-            </div>
-          </div>
-          <div className="h-16" aria-hidden="true" />
-        </>
-      )}
+            {company.quarterly.length ? (
+              <section aria-labelledby="chart-title">
+                <SectionHeader id="chart-title" title="Revenue and EBITDA margin" hint="last 8 quarters" />
+                <div className="border border-[#E5E7EB] p-3">
+                  <RevenueChart quarterly={company.quarterly} />
+                </div>
+                <p className={`mt-1.5 text-[12.5px] ${illustrative ? "bg-[#F5F1E8] px-3 py-2 text-black" : "text-[#4B5563]"}`}>
+                  {illustrative
+                    ? SOURCE_LABEL.illustrative_snapshot
+                    : SOURCE_LABEL[company.quarterly[company.quarterly.length - 1].source] ?? `Source: ${company.quarterly[company.quarterly.length - 1].source}.`}
+                </p>
+                {company.portfolio_context?.revenue_yoy != null && company.portfolio_context.portfolio_median_yoy != null ? (
+                  <p className="num mt-2 text-[13.5px]">
+                    Latest revenue{" "}
+                    <b style={{ color: toneColor(company.portfolio_context.revenue_yoy) }}>{pct(company.portfolio_context.revenue_yoy)} YoY</b>{" "}
+                    against a portfolio median of {pct(company.portfolio_context.portfolio_median_yoy)}.
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
+
+            <section aria-labelledby="history-title">
+              <SectionHeader id="history-title" title="Your decisions" hint={decisions?.length || undefined} />
+              {decisions === null ? (
+                <Skeleton className="h-12 w-full" />
+              ) : decisions.length ? (
+                <ul>
+                  {decisions.map((d) => (
+                    <li key={d.alert_id}>
+                      <Link href={`/alert/${d.alert_id}`} className="flex min-h-12 items-start gap-3 border-t border-[#E5E7EB] py-2.5 hover:bg-black/[0.02]">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[14.5px] font-semibold leading-snug">
+                            {VERDICT_LABEL[d.verdict]}
+                            <span className="num font-normal text-[#4B5563]"> · {shortDate(d.created_at)}</span>
+                          </p>
+                          <p className="truncate text-[13px] text-[#4B5563]">{d.headline.replace(/^.{3,70}?\s+[-–]\s*/, "")}</p>
+                          {d.note ? <p className="mt-1 text-[14px] leading-snug">&ldquo;{d.note}&rdquo;</p> : null}
+                        </div>
+                        <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-[#6B7280]" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="border-t border-[#E5E7EB] py-3 text-[14px] text-[#4B5563]">
+                  No decisions on {ticker} yet. Verdicts you give in the brief are kept here with your reasons.
+                </p>
+              )}
+            </section>
+
+            <section aria-labelledby="wp-title">
+              <SectionHeader id="wp-title" title="Your watchpoints" hint={points.length || undefined} />
+              <Watchpoints ticker={ticker} points={points} onChange={setPoints} />
+            </section>
+
+            {company.filings.length ? (
+              <section aria-labelledby="filings-title">
+                <SectionHeader id="filings-title" title="Recent filings" hint={company.filings.length} />
+                <ul>
+                  {company.filings.map((f) => (
+                    <li key={f.id} className="border-t border-[#E5E7EB] py-2.5">
+                      <p className="line-clamp-2 text-[14px] leading-snug">{f.headline.replace(/^.{3,70}?\s+[-–]\s*/, "")}</p>
+                      <p className="num mt-0.5 text-[12.5px] text-[#4B5563]">
+                        {catLabel(f.category)} · {shortDate(f.filed_at)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </>
+        )}
+      </div>
     </main>
   );
 }
 
-/** Portfolio-relative growth line: how this quarter's YoY compares to the book. */
-function PortfolioContext({ yoy, median }: { yoy: number; median: number }) {
-  const delta = Math.round((yoy - median) * 10) / 10;
-  const ahead = delta >= 0;
-  return (
-    <div className="card flex items-center gap-3 p-3.5">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth={1.8} className="h-4 w-4 shrink-0" aria-hidden="true">
-        <path d="M4 19h16M6 16V9m4 7V5m4 11v-4m4 4V8" strokeLinecap="round" />
-      </svg>
-      <p className="num text-[12px] leading-snug text-[#4B5563]">
-        Latest revenue <b className="text-[#000000]">{yoy > 0 ? "+" : ""}{yoy.toFixed(1)}% YoY</b> vs{" "}
-        <b className="text-[#000000]">{median > 0 ? "+" : ""}{median.toFixed(1)}%</b> portfolio median —{" "}
-        <b style={{ color: ahead ? "#1E6B4F" : "#B4442C" }}>
-          {ahead ? `${delta.toFixed(1)} pts ahead` : `${Math.abs(delta).toFixed(1)} pts behind`}
-        </b>{" "}
-        of the tracked portfolio.
-      </p>
-    </div>
-  );
+function toneColor(v: number | null | undefined) {
+  const t = toneFor(v);
+  return t === "pos" ? "#1E6B4F" : t === "neg" ? "#B4442C" : "#4B5563";
 }
 
-function UnavailableCompany({ ticker }: { ticker: string }) {
+function coverageText(c: CompanyResponse): string {
+  const ch = c.coverage!.chunks;
+  const docs = [ch.transcripts ? "call transcripts" : null, ch.annual_reports ? "annual report" : null, ch.results ? "results presentation" : null].filter(Boolean);
+  if (!docs.length) return c.preparing?.state === "running" ? "Fetching documents now." : "No primary documents on file.";
+  if (c.preparing?.state === "running") return `On file: ${docs.join(", ")}. Checking for newer calls.`;
+  return `On file: ${docs.join(", ")}.`;
+}
+
+/** Map the backend's progress message onto three plain stages. */
+function prepStages(message: string, state: "running" | "done"): Stage[] {
+  const reading = /^reading/i.test(message);
+  return [
+    {
+      label: "Finding call transcripts and annual report",
+      state: reading || state === "done" ? "done" : "active",
+      detail: !reading && !/^finding/i.test(message) ? message : undefined,
+    },
+    { label: "Reading the calls", state: reading ? "active" : state === "done" ? "done" : "pending", detail: reading ? message.replace(/^Reading\s+/i, "") : undefined },
+    { label: "Grading promises against reported numbers", state: "pending" },
+  ];
+}
+
+/** Skeleton for a quick load; staged steps once it is clearly a live fetch. */
+function ColdStart({ ticker }: { ticker: string }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setSlow(true), 2500);
+    return () => window.clearTimeout(t);
+  }, []);
   return (
-    <section className="px-4 pt-4" aria-labelledby="coverage-unavailable-title">
-      <div className="card p-5">
-        <h1 id="coverage-unavailable-title" className="text-[16px] font-bold text-[#000000]">Research unavailable for {ticker}</h1>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-[#4B5563]">
-          FINN does not have tracked primary-source coverage for this ticker, so it will not generate an ungrounded company page.
-        </p>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <Link
-            href="/companies"
-            className="press inline-flex min-h-11 items-center justify-center border border-black px-4 text-[12px] font-semibold text-[#000000]"
-          >
-            Try another ticker
-          </Link>
-          <Link
-            href={`/chat?ticker=${encodeURIComponent(ticker)}`}
-            className="press inline-flex min-h-11 items-center justify-center bg-black px-4 text-[12px] font-semibold text-white"
-          >
-            Ask FINN about coverage
-          </Link>
+    <section aria-label={`Loading ${ticker}`}>
+      <h1 className="display num text-[30px] leading-none">{ticker}</h1>
+      {slow ? (
+        <div className="card mt-4 p-4">
+          <StagedProgress
+            stages={[
+              { label: "Looking up the quote and quarterly numbers", state: "active" },
+              { label: "Finding call transcripts and annual report", state: "pending" },
+              { label: "Grading promises against reported numbers", state: "pending" },
+            ]}
+            note="FINN fetches these live the first time a company is opened."
+          />
         </div>
-        <p className="mt-2 text-[11.5px] leading-relaxed text-[#4B5563]">
-          In chat, FINN will say when the available primary sources cannot answer your question.
-        </p>
-      </div>
+      ) : (
+        <div role="status" aria-label="Loading">
+          <Skeleton className="mt-3 h-4 w-[60%]" />
+          <Skeleton className="mt-6 h-32 w-full" />
+          <Skeleton className="mt-6 h-16 w-full" />
+        </div>
+      )}
     </section>
   );
 }
 
-function DocBadge({ label, n }: { label: string; n?: number }) {
-  if (!n && n !== 0) return null;
+function NotCovered({ ticker }: { ticker: string }) {
   return (
-    <span className="chip" style={{ backgroundColor: "#F5F1E8", color: "#000000" }}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3 w-3" aria-hidden="true">
-        <path d="M5 12.5l4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      {n} {label}
-    </span>
-  );
-}
-
-function FilingsList({ filings }: { filings: CompanyResponse["filings"] }) {
-  if (!filings.length) {
-    return <p className="card p-4 text-[12.5px] text-[#4B5563]">No filings ingested yet.</p>;
-  }
-  return (
-    <div className="space-y-2.5">
-      {filings.slice(0, 8).map((f) => (
-        <div key={f.id} className="card p-3.5">
-          <div className="flex items-center gap-2">
-            <CategoryChip category={f.category} />
-            <span className="num ml-auto text-[11px] text-[#4B5563]">{shortDate(f.filed_at)}</span>
-          </div>
-          <p className="mt-1.5 text-[13.5px] font-medium leading-snug text-[#000000]">{f.headline}</p>
-        </div>
-      ))}
-      {filings.length > 8 && (
-        <p className="text-center text-[11px] text-[#4B5563]">+ {filings.length - 8} older filings grounded in FINN</p>
-      )}
-    </div>
+    <section className="card p-5" aria-labelledby="nc-title">
+      <h1 id="nc-title" className="display text-[22px] leading-tight">
+        {ticker} is not covered by primary sources
+      </h1>
+      <p className="mt-2 text-[14.5px] leading-relaxed text-[#4B5563]">
+        FINN found no quote, filings, call transcripts or annual report for this symbol. It will not build a company page from model memory.
+      </p>
+      <p className="mt-2 text-[14.5px] leading-relaxed text-[#4B5563]">Check the NSE or BSE symbol. For example, Persistent Systems is PERSISTENT.</p>
+      <Link href="/companies" className="btn btn-primary mt-4 w-full">
+        Try another ticker
+      </Link>
+    </section>
   );
 }

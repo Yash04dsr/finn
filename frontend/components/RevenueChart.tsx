@@ -40,7 +40,7 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Quarterly revenue and EBITDA margin">
         {/* horizontal gridlines */}
         {[0.5, 1].map((f) => (
-          <line key={f} x1={0} x2={W} y1={yRev(maxRev * f)} y2={yRev(maxRev * f)} stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
+          <line key={f} x1={0} x2={W} y1={yRev(maxRev * f)} y2={yRev(maxRev * f)} stroke="#E5E7EB" strokeWidth={1} />
         ))}
         {series.map((s, i) => {
           const h = Math.max(2, H - PAD_B - yRev(s.revenue ?? 0));
@@ -54,7 +54,7 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
                 y={H - PAD_B - h}
                 width={barW}
                 height={h}
-                rx={4}
+                rx={0}
                 fill={isActive ? "#000000" : "rgba(0,0,0,0.18)"}
               />
               {isLast && (
@@ -62,14 +62,14 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
                   x={i * slot + slot / 2}
                   y={H - PAD_B - h - 7}
                   textAnchor="middle"
-                  fontSize={9.5}
+                  fontSize={10.5}
                   fill="#000000"
                   style={{ fontVariantNumeric: "tabular-nums" }}
                 >
                   {crore(s.revenue).replace(" Cr", "")}
                 </text>
               )}
-              <text x={i * slot + slot / 2} y={H - 7} textAnchor="middle" fontSize={8.5} fill="#4B5563">
+              <text x={i * slot + slot / 2} y={H - 7} textAnchor="middle" fontSize={9.5} fill="#4B5563">
                 {s.period}
               </text>
             </g>
@@ -82,17 +82,17 @@ export default function RevenueChart({ quarterly }: { quarterly: QuarterlyRow[] 
           <circle cx={margins[margins.length - 1].i * slot + slot / 2} cy={yMar(margins[margins.length - 1].m)} r={3} fill="#B38B6D" />
         )}
       </svg>
-      <div className="mt-2 flex items-center justify-between text-[11px]">
-        <span className="text-[#4B5563]">
-          <span className="font-semibold text-[#000000]">{q.period}</span> · Rev {crore(q.revenue)} · EBITDA {crore(q.ebitda)}
-        </span>
-        <span className="flex items-center gap-1 text-[#4B5563]">
-          <span className="h-[3px] w-4 bg-black" />
-          Revenue
-          <span className="ml-2 h-[3px] w-4 bg-[#B38B6D]" />
-          Margin
-        </span>
-      </div>
+      <p className="num mt-2 text-[13px] text-[#4B5563]" aria-live="polite">
+        <span className="font-semibold text-black">{q.period.replace(/^(Q\d)(FY)/, "$1 $2")}</span> · Revenue {crore(q.revenue)} · EBITDA margin{" "}
+        {q.revenue && q.ebitda != null ? `${((q.ebitda / q.revenue) * 100).toFixed(1)}%` : "not reported"}
+      </p>
+      <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[12px] text-[#4B5563]">
+        <span className="h-[3px] w-4 shrink-0 bg-black" aria-hidden="true" />
+        <span>Revenue</span>
+        <span className="ml-3 h-[3px] w-4 shrink-0 bg-[#B38B6D]" aria-hidden="true" />
+        <span>EBITDA margin</span>
+        <span className="ml-auto">Tap a quarter</span>
+      </p>
     </div>
   );
 }

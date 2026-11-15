@@ -119,24 +119,80 @@ def check_price_volume(ticker: str, thresholds: dict | None = None) -> list[dict
     return alerts
 
 
+BASE_TIER = {
+    "results": 1, "M&A": 1, "management_change": 1, "litigation": 1, "pledging": 1,
+    "fund_raise": 2, "insider_trading": 2, "capex": 2, "credit_rating": 2,
+    "dividend": 3, "earnings_call": 3, "press_release": 3, "bonus_split": 3,
+    "investor_meetings": 4, "postal_ballot": 4, "agm_egm": 4, "unclassified": 4,
+}
+
+# Headline wording that changes how much a filing matters, checked in order.
+HEADLINE_RULES: list[tuple[re.Pattern, int, str]] = [
+    (re.compile(r"esop|employee stock option|shareholding pattern|compliance certificate|"
+                r"duplicate (share )?certificate|loss of share certificate|newspaper|trading window|"
+                r"regulation 74|postal ballot result|egm result|agm result|schedule of analyst",
+                re.I), 4, "routine paperwork"),
+    (re.compile(r"intimation|to consider|will consider", re.I), 3,
+     "a notice of an upcoming event, not the event itself"),
+    (re.compile(r"reaffirm", re.I), 3, "a reaffirmed rating, so nothing changed"),
+    (re.compile(r"commercial paper", re.I), 3, "routine short-term borrowing"),
+    (re.compile(r"release of (shares )?pledge|pledge(d)? .*released|revocation of pledge", re.I), 3,
+     "pledged shares were released, which lowers risk"),
+    (re.compile(r"monthly business update", re.I), 3, "a regular monthly update"),
+    (re.compile(r"secures? orders?|order (win|inflow)|bags? order", re.I), 2, "a new order win"),
+    (re.compile(r"buyback", re.I), 2, "a buyback returns cash to shareholders"),
+]
+
+CATEGORY_WORDS = {
+    "M&A": "an acquisition or merger", "management_change": "a leadership change",
+    "litigation": "a legal or regulatory action", "results": "quarterly results",
+    "pledging": "promoter share pledging", "fund_raise": "a fund raise",
+    "insider_trading": "insider or promoter trading", "capex": "a capacity investment",
+    "credit_rating": "a credit rating action", "dividend": "a dividend",
+    "earnings_call": "an earnings call notice", "press_release": "a press release",
+}
+
+
 def announcement_priority(category: str, importance_hint: int | None = None,
-                          thresholds: dict | None = None) -> tuple[int, str]:
-    """Map an announcement to a feed priority (1=drop-everything ... 4=bury) + why string."""
+                          thresholds: dict | None = None, headline: str = "") -> tuple[int, str]:
+    """Map an announcement to a feed priority (1 = read now ... 4 = routine, counted) + reason."""
     th = thresholds or get_thresholds()
-    base = {"results": 1, "M&A": 1, "management_change": 1, "litigation": 1}.get(category, None)
-    if base is None:
-        base = 2 if category in {"fund_raise", "insider_trading", "pledging", "capex",
-                                 "credit_rating"} else 3
-    watch_bonus = ""
-    if category in th.get("categories_watch", []) and base > 1:
-        base = max(1, base - 1)
-        watch_bonus = " You flagged this category as one you care about."
-    if category in {"unclassified"}:
-        base = 4
-    if importance_hint and importance_hint <= 2 and base > 2:
+    base = BASE_TIER.get(category, 3)
+    reason = CATEGORY_WORDS.get(category, "a corporate filing")
+    for pattern, tier, why in HEADLINE_RULES:
+        if headline and pattern.search(headline):
+            base, reason = tier, why
+            break
+    if importance_hint and importance_hint <= 2 and base == 3:
         base = 2
-    why = f"Classified {category}, priority tier {base}." + watch_bonus
+    note = ""
+    watched = th.get("categories_watch", [])
+    if base < 4 and category in watched:
+        note = " It is in a category you asked to watch."
+    elif base < 4 and watched and category not in watched:
+        base += 1
+        note = " You do not watch this category, so it ranks lower."
+    labels = {1: "Read now", 2: "Worth a look", 3: "Background", 4: "Routine"}
+    why = f"{labels[base]}: {reason}.{note}"
     return base, why
+
+
+def rescore_announcements() -> int:
+    """Re-rank stored filing alerts with the current rules and the investor's settings."""
+    import json
+
+    th = get_thresholds()
+    changed = 0
+    with db.db() as c:
+        rows = c.execute("SELECT id, payload, priority, why FROM alerts WHERE kind='announcement'").fetchall()
+        for r in rows:
+            p = json.loads(r["payload"])
+            pri, why = announcement_priority(p.get("category") or "unclassified", None, th,
+                                             p.get("headline") or "")
+            if pri != r["priority"] or why != r["why"]:
+                c.execute("UPDATE alerts SET priority=?, why=? WHERE id=?", (pri, why, r["id"]))
+                changed += 1
+    return changed
 
 
 def in_quiet_hours(ts: datetime | None = None) -> bool:

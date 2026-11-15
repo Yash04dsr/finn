@@ -7,7 +7,7 @@ import { Pressable, Text, View } from 'react-native';
 import { colors, radius, type } from '../lib/theme';
 import { relTime, catLabel, fmtPrice, fmtX, fmtPct } from '../lib/format';
 import type { Alert, AnnouncementPayload, MetricPayload, DigestPayload } from '../lib/types';
-import { CategoryChip, ChevronRight } from './ui';
+import { CategoryChip, ChevronRight, TickerBadge } from './ui';
 
 interface Props {
   alert: Alert;
@@ -26,7 +26,7 @@ export function alertHeadline(alert: Alert): string {
 export function AlertRow({ alert, onPress }: Props) {
   const p = alert.payload as Partial<AnnouncementPayload & MetricPayload & DigestPayload>;
   const prioColor =
-    alert.priority <= 1 ? colors.red : alert.priority === 2 ? colors.amber : colors.faint;
+    alert.priority <= 1 ? '#000000' : alert.priority === 2 ? colors.tan : colors.border;
   const category = alert.kind === 'announcement' ? p.category ?? '' : alert.kind;
 
   let sub = '';
@@ -43,50 +43,38 @@ export function AlertRow({ alert, onPress }: Props) {
   return (
     <Pressable
       onPress={() => onPress(alert)}
-      android_ripple={{ color: 'rgba(255,255,255,0.04)' }}
+      android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
       style={({ pressed }) => ({
         opacity: pressed ? 0.82 : 1,
         flexDirection: 'row',
-        alignItems: 'stretch',
+        alignItems: 'flex-start',
+        gap: 12,
+        padding: 14,
+        marginBottom: 10,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderTopWidth: 2,
+        borderTopColor: '#000000',
       })}
     >
-      {/* priority bar */}
-      <View style={{ width: 3, borderRadius: 2, backgroundColor: prioColor, marginRight: 12 }} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingVertical: 13 }}>
-        {/* ticker badge */}
-        <View
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 12,
-            backgroundColor: colors.surface2,
-            borderWidth: 1,
-            borderColor: colors.border,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 11,
-          }}
-        >
-          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 10.5, letterSpacing: 0.2 }} numberOfLines={2}>
-            {alert.ticker}
-          </Text>
+      <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: prioColor }} />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TickerBadge ticker={alert.ticker} />
+          {alert.kind === 'announcement' && category ? <CategoryChip label={category} small /> : null}
+          <Text style={[type.micro, { marginLeft: 'auto' }]}>{relTime(alert.created_at)}</Text>
         </View>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={[type.h3, { fontSize: 13.5, lineHeight: 18, marginBottom: 3 }]} numberOfLines={2}>
-            {alertHeadline(alert)}
+        <Text style={[type.h3, { fontSize: 13.5, lineHeight: 18, marginTop: 6, fontWeight: '500' }]} numberOfLines={2}>
+          {alertHeadline(alert)}
+        </Text>
+        {sub ? (
+          <Text style={[type.small, { fontSize: 12, lineHeight: 16, marginTop: 4 }]} numberOfLines={2}>
+            {sub}
           </Text>
-          {sub ? (
-            <Text style={[type.small, { fontSize: 12, lineHeight: 16 }]} numberOfLines={2}>
-              {sub}
-            </Text>
-          ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 8 }}>
-            {category ? <CategoryChip label={category} small /> : null}
-            <Text style={type.micro}>{relTime(alert.created_at)}</Text>
-          </View>
-        </View>
-        <ChevronRight />
+        ) : null}
       </View>
+      <ChevronRight color="#808080" />
     </Pressable>
   );
 }

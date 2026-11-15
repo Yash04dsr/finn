@@ -4,23 +4,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CostsResponse, Settings } from "@/lib/types";
 import { api } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
-import { compactNum } from "@/lib/format";
+import { catLabel, fmtTokens } from "@/lib/format";
 import { CATEGORIES } from "@/lib/types";
 import Header from "@/components/Header";
 import { ListSkeleton, ErrorRow } from "@/components/Skeleton";
 
 export default function SettingsPage() {
   return (
-    <main className="pb-[92px]">
-      <Header />
-      <div className="px-4 pt-3">
+    <main className="pb-[calc(var(--tabbar-h)+var(--safe-bottom)+24px)]">
+      <Header title="Settings" />
+      <div className="px-4 pt-4">
         <AlertSettings />
         <PushCard />
         <CostDashboard />
         <OpsCard />
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-[#4B5563]">
-          FINN · investment intelligence · built on Google ADK
-        </p>
       </div>
       <ToastHost />
     </main>
@@ -40,7 +37,7 @@ function AlertSettings() {
 
   if (loading && !draft) {
     return (
-      <div className="card mb-4 p-4">
+      <div className="card mb-5 p-4">
         <ListSkeleton rows={2} />
       </div>
     );
@@ -48,7 +45,7 @@ function AlertSettings() {
   if (error && !draft) {
     return (
       <div className="mb-4">
-        <ErrorRow message={`Couldn't load settings — ${error}`} onRetry={reload} />
+        <ErrorRow message={"FINN could not load your settings. Check the connection and try again."} onRetry={reload} />
       </div>
     );
   }
@@ -63,7 +60,7 @@ function AlertSettings() {
       reload();
     } catch {
       window.dispatchEvent(new CustomEvent("finn-toast", {
-        detail: { message: "Couldn't save — connection issue. Check the backend and retry.", error: true },
+        detail: { message: "Could not save your settings. Check the connection and try again.", error: true },
       }));
     } finally {
       setSaving(false);
@@ -71,24 +68,24 @@ function AlertSettings() {
   };
 
   return (
-    <section className="card mb-4 p-4" aria-label="Alert settings">
+    <section className="card mb-5 p-4" aria-label="Alert settings">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold text-[#000000]">Alerts</h2>
+        <h2 className="text-[15px] font-bold text-[#000000]">What reaches your brief</h2>
         {dirty && (
           <button
             onClick={save}
             disabled={saving}
-            className="press min-h-[36px] bg-black px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.09em] text-white hover:bg-[#1F2937] disabled:opacity-40"
+            className="btn btn-primary px-4"
           >
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? "Saving" : "Save changes"}
           </button>
         )}
       </div>
 
       {/* Volume multiplier */}
       <label className="block">
-        <span className="num text-[12.5px] text-[#000000]">
-          Volume &gt; <b className="text-black">{draft.volume_multiplier.toFixed(1)}×</b> 20-day avg
+        <span className="num text-[14px] text-[#000000]">
+          Volume above <b className="text-black">{draft.volume_multiplier.toFixed(1)}x</b> the 20-day average
         </span>
         <input
           type="range"
@@ -100,7 +97,7 @@ function AlertSettings() {
           onChange={(e) => setDraft({ ...draft, volume_multiplier: Number(e.target.value) })}
           className="mt-2.5"
         />
-        <span className="mt-1 flex justify-between text-[10px] text-[#4B5563]">
+        <span className="mt-1 flex justify-between text-[12px] text-[#4B5563]">
           <span>1.5×</span>
           <span>5×</span>
         </span>
@@ -108,8 +105,8 @@ function AlertSettings() {
 
       {/* Price move % */}
       <label className="mt-4 block">
-        <span className="num text-[12.5px] text-[#000000]">
-          |move| &gt; <b className="text-black">{draft.price_move_pct.toFixed(1)}%</b> in a day
+        <span className="num text-[14px] text-[#000000]">
+          Price move above <b className="text-black">{draft.price_move_pct.toFixed(1)}%</b> in a day
         </span>
         <input
           type="range"
@@ -121,15 +118,15 @@ function AlertSettings() {
           onChange={(e) => setDraft({ ...draft, price_move_pct: Number(e.target.value) })}
           className="mt-2.5"
         />
-        <span className="mt-1 flex justify-between text-[10px] text-[#4B5563]">
+        <span className="mt-1 flex justify-between text-[12px] text-[#4B5563]">
           <span>1%</span>
           <span>10%</span>
         </span>
       </label>
 
       {/* Category watchlist */}
-      <p className="mb-2 mt-5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#4B5563]">
-        Category watchlist · {draft.categories_watch.length}/{CATEGORIES.length}
+      <p className="mb-2 mt-5 label">
+        Filing types you watch · {draft.categories_watch.length} of {CATEGORIES.length}
       </p>
       <div className="flex flex-wrap gap-1.5">
         {CATEGORIES.map((cat) => {
@@ -146,21 +143,21 @@ function AlertSettings() {
                 })
               }
               aria-pressed={on}
-              className="press min-h-[36px] border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.07em] transition-colors"
+              className="press min-h-11 border px-3 text-[13px] font-semibold transition-colors"
               style={
                 on
                   ? { borderColor: "#000000", background: "#000000", color: "#FFFFFF" }
                   : { borderColor: "rgba(0,0,0,0.25)", background: "#FFFFFF", color: "#4B5563" }
               }
             >
-              {cat.replace(/_/g, " ")}
+              {catLabel(cat)}
             </button>
           );
         })}
       </div>
 
       {/* Quiet hours */}
-      <p className="mb-2 mt-5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#4B5563]">Quiet hours</p>
+      <p className="mb-2 mt-5 label">Quiet hours</p>
       <div className="flex items-center gap-2.5">
         <TimeInput value={draft.quiet_hours_start} onChange={(v) => setDraft({ ...draft, quiet_hours_start: v })} />
         <span className="text-[12px] text-[#4B5563]">to</span>
@@ -176,7 +173,7 @@ function TimeInput({ value, onChange }: { value: string; onChange: (v: string) =
       type="time"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="num rounded-none border border-[#000000]/[0.14] bg-[#FFFFFF] px-3 py-2 text-[16px] outline-none focus:border-black"
+      className="field num w-auto"
     />
   );
 }
@@ -221,23 +218,24 @@ function PushCard() {
   };
 
   const label =
-    state === "working" ? "Enabling…" :
-    state === "on" ? "Push notifications enabled" :
-    state === "denied" ? "Permission denied — enable in browser settings" :
-    state === "unsupported" ? "Push not supported on this browser" :
-    state === "failed" ? "Couldn’t enable push — retry" :
-    "Enable push notifications";
+    state === "working" ? "Turning alerts on" :
+    state === "on" ? "Alerts are on for this device" :
+    state === "denied" ? "Alerts are blocked. Allow them in browser settings." :
+    state === "unsupported" ? "This browser cannot receive alerts" :
+    state === "failed" ? "Could not turn alerts on. Try again." :
+    "Turn on alerts";
 
   return (
-    <section className="card mb-4 p-4" aria-label="Push notifications">
-      <h2 className="text-[13px] font-semibold text-[#000000]">Push notifications</h2>
-      <p className="mt-1 text-[12px] leading-relaxed text-[#4B5563]">
-        Priority-1 alerts ping your phone the moment they fire. Quiet hours still apply.
+    <section className="card mb-5 p-4" aria-label="Push notifications">
+      <h2 className="text-[15px] font-bold text-[#000000]">Alerts on this phone</h2>
+      <p className="mt-1 text-[14px] leading-relaxed text-[#4B5563]">
+        Items that need a decision reach your phone when they are filed, and open straight on the evidence. Quiet hours still apply.
       </p>
+      <IosHomeScreenHint />
       <button
         onClick={enable}
         disabled={state === "working" || state === "on" || state === "denied" || state === "unsupported"}
-        className="press mt-3 flex w-full items-center justify-center gap-2 rounded-none border border-black bg-transparent py-3 text-[12px] font-semibold uppercase tracking-[0.1em] text-black hover:bg-black hover:text-white disabled:opacity-40"
+        className="btn btn-primary mt-3 w-full"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4" aria-hidden="true">
           <path d="M12 3a6 6 0 0 0-6 6v3.5L4.5 16h15L18 12.5V9a6 6 0 0 0-6-6ZM10 19a2 2 0 0 0 4 0" strokeLinecap="round" strokeLinejoin="round" />
@@ -245,6 +243,27 @@ function PushCard() {
         {label}
       </button>
     </section>
+  );
+}
+
+/** iOS only delivers web push to sites added to the Home Screen and opened from there. */
+function IosHomeScreenHint() {
+  const [env, setEnv] = useState<{ ios: boolean; standalone: boolean } | null>(null);
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
+    setEnv({ ios, standalone });
+  }, []);
+  if (env?.standalone) return null;
+  return (
+    <div className={`mt-3 px-3 py-2.5 text-[13.5px] leading-snug ${env?.ios ? "bg-[#F5F1E8] text-black" : "border border-[#E5E7EB] text-[#4B5563]"}`}>
+      <p className="font-semibold text-black">On iPhone, add FINN to your Home Screen for alerts</p>
+      <p className="mt-0.5">
+        In Safari tap Share, then Add to Home Screen. Open FINN from the Home Screen and turn alerts on here.
+      </p>
+    </div>
   );
 }
 
@@ -263,18 +282,18 @@ function CostDashboard() {
   const { data, error } = useApiSafe<CostsResponse>(useCallback((s: AbortSignal) => api.costs(s), []));
 
   return (
-    <section className="card mb-4 p-4" aria-label="Token usage ledger">
+    <section className="card mb-5 p-4" aria-label="Token usage ledger">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold text-[#000000]">Token usage</h2>
+        <h2 className="text-[15px] font-bold text-[#000000]">Model usage</h2>
         {data && (
-          <span className="num text-[12px] font-semibold text-[#000000]">{compactNum(data.total_tokens)} tokens</span>
+          <span className="num text-[14px] font-semibold text-[#000000]">{fmtTokens(data.total_tokens)} tokens</span>
         )}
       </div>
-      <p className="mt-1 text-[11px] leading-relaxed text-[#4B5563]">
-        Provider-reported tokens by routing tier. This is usage telemetry, not billed cost.
+      <p className="mt-1 text-[13.5px] leading-relaxed text-[#4B5563]">
+        Tokens reported by the model provider, split by routing tier. A fast model handles classification and short summaries; the reasoning model is used only for research answers.
       </p>
 
-      {error && <p className="mt-2 text-[11.5px] text-[#4B5563]">Cost data unavailable — backend offline.</p>}
+      {error && <p className="mt-2 text-[13px] text-[#4B5563]">Usage is unavailable while FINN is offline.</p>}
 
       {data && (
         <>
@@ -284,9 +303,9 @@ function CostDashboard() {
           </div>
 
           <div className="mt-4 overflow-hidden rounded-none border border-[#000000]/[0.12]">
-            <table className="num w-full text-[11.5px]">
+            <table className="num w-full text-[13px]">
               <thead>
-                <tr className="bg-[#000000]/[0.04] text-left text-[10px] uppercase tracking-wider text-[#4B5563]">
+                <tr className="bg-[#000000]/[0.04] text-left text-[11px] uppercase tracking-[0.08em] text-[#4B5563]">
                   <th className="px-2.5 py-2 font-semibold">Scope</th>
                   <th className="px-2 py-2 font-semibold">Model</th>
                   <th className="px-2 py-2 text-right font-semibold">In</th>
@@ -299,24 +318,21 @@ function CostDashboard() {
                   <tr key={`${r.scope}-${r.model}-${i}`} className="border-t border-[#000000]/[0.08]">
                     <td className="px-2.5 py-2 font-medium text-[#000000]">{r.scope}</td>
                     <td className="px-2 py-2 text-[#4B5563]">{shortModel(r.model)}</td>
-                    <td className="px-2 py-2 text-right text-[#000000]">{compactNum(r.pt)}</td>
-                    <td className="px-2 py-2 text-right text-[#000000]">{compactNum(r.ct)}</td>
+                    <td className="px-2 py-2 text-right text-[#000000]">{fmtTokens(r.pt)}</td>
+                    <td className="px-2 py-2 text-right text-[#000000]">{fmtTokens(r.ct)}</td>
                     <td className="px-2.5 py-2 text-right text-[#000000]">{r.calls}</td>
                   </tr>
                 ))}
                 {data.by_scope_model.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-2.5 py-3 text-center text-[#4B5563]">
-                      No model calls yet — run the demo pipeline.
+                      No model calls yet. Run the demo below.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-          <p className="mt-2.5 text-[11px] leading-relaxed text-[#4B5563]">
-            Smart routing: fast tier for bulk work, reasoning tier only for analysis.
-          </p>
         </>
       )}
     </section>
@@ -335,12 +351,12 @@ function TierBar({ costs }: { costs: CostsResponse }) {
         <div style={{ width: `${fastPct}%`, background: "#000000" }} />
         <div style={{ width: `${100 - fastPct}%`, background: "#B38B6D" }} />
       </div>
-      <div className="mt-1.5 flex justify-between text-[10.5px] text-[#4B5563]">
+      <div className="mt-1.5 flex justify-between text-[12px] text-[#4B5563]">
         <span className="flex items-center gap-1">
-          <span className="h-1.5 w-1.5 bg-black" /> fast {compactNum(fast)}
+          <span className="h-1.5 w-1.5 bg-black" /> fast {fmtTokens(fast)}
         </span>
         <span className="flex items-center gap-1">
-          reasoning {compactNum(reasoning)} <span className="h-1.5 w-1.5 bg-[#B38B6D]" />
+          reasoning {fmtTokens(reasoning)} <span className="h-1.5 w-1.5 bg-[#B38B6D]" />
         </span>
       </div>
     </div>
@@ -348,7 +364,7 @@ function TierBar({ costs }: { costs: CostsResponse }) {
 }
 
 function shortModel(m: string): string {
-  return m.length > 18 ? `${m.slice(0, 17)}…` : m;
+  return m.length > 18 ? `${m.slice(0, 17)}...` : m;
 }
 
 /* ─── Ops: demo pipeline ─────────────────────────────────────────────────── */
@@ -361,40 +377,40 @@ function OpsCard() {
     setState("running");
     try {
       const r = await api.runDemo();
-      setResult(`${r.mode === "snapshot" ? "Snapshot" : "Live"} run · ${r.digested ?? 0} filings digested · ${r.alerts ?? 0} alerts`);
+      setResult(`${r.mode === "sample" ? "Sample day" : "Live"} run: ${r.filings_seen ?? 0} filings read, ${r.new_alerts ?? 0} new alerts.`);
       setState("done");
     } catch (e) {
-      setResult(e instanceof Error ? e.message : "Pipeline failed");
+      setResult(e instanceof Error ? e.message : "The run failed. Try again.");
       setState("error");
     }
   };
 
   return (
     <section className="card p-4" aria-label="Operations">
-      <h2 className="text-[13px] font-semibold text-[#000000]">Operations</h2>
-      <p className="mt-1 text-[12px] leading-relaxed text-[#4B5563]">
-        Trigger one end-of-day run: ingest → rank → digest. Useful for the live demo before walking through the feed.
+      <h2 className="text-[15px] font-bold text-[#000000]">Demo day</h2>
+      <p className="mt-1 text-[14px] leading-relaxed text-[#4B5563]">
+        Runs one end-of-day pass now: fetch filings, rank them, and rebuild the brief. Outside market hours this loads the labelled sample day.
       </p>
       <button
         onClick={run}
         disabled={state === "running"}
-        className="press mt-3 flex w-full items-center justify-center gap-2 rounded-none border border-[#000000]/[0.14] bg-[#000000]/[0.04] py-2.5 text-[13px] font-semibold text-[#000000] disabled:opacity-60"
+        className="btn btn-secondary mt-3 w-full"
       >
         {state === "running" ? (
           <>
-            <span className="pulse-dot" aria-hidden="true" /> Running pipeline…
+            <span className="pulse-dot" aria-hidden="true" /> Running
           </>
         ) : (
           <>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4" aria-hidden="true">
               <path d="M5 4.5v15l13-7.5-13-7.5Z" strokeLinejoin="round" />
             </svg>
-            Run demo pipeline
+            Run the evening pass
           </>
         )}
       </button>
-      {state === "done" && <p className="mt-2 text-[11.5px] font-medium text-black">{result}</p>}
-      {state === "error" && <p className="mt-2 text-[11.5px] font-medium text-[#B4442C]">{result}</p>}
+      {state === "done" && <p className="mt-2 text-[13.5px] font-semibold text-black">{result}</p>}
+      {state === "error" && <p className="mt-2 text-[13.5px] font-semibold text-black">{result}</p>}
     </section>
   );
 }
@@ -403,14 +419,12 @@ function OpsCard() {
 
 function ToastHost() {
   const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ message: string; error?: boolean }>).detail;
       setMsg(detail.message);
-      setErr(!!detail.error);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setMsg(null), 3200);
     };
@@ -423,7 +437,7 @@ function ToastHost() {
 
   if (!msg) return null;
   return (
-    <div className={`toast ${err ? "toast-err" : ""}`} role="status">
+    <div className="toast" role="status">
       {msg}
     </div>
   );

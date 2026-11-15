@@ -25,6 +25,8 @@ export function DigestCard({ digest }: { digest: Digest | null }) {
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.border,
+        borderTopWidth: 2,
+        borderTopColor: '#000000',
         overflow: 'hidden',
       }}
     >
@@ -32,18 +34,16 @@ export function DigestCard({ digest }: { digest: Digest | null }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
           <View
             style={{
-              backgroundColor: colors.accentDim,
-              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: '#000000',
               paddingHorizontal: 7,
-              paddingVertical: 2.5,
-              marginRight: 8,
+              paddingVertical: 3,
             }}
           >
-            <Text style={{ color: colors.accent, fontSize: 10.5, fontWeight: '700', letterSpacing: 0.4 }}>
-              FINN BRIEF
+            <Text style={{ color: '#000000', fontSize: 10, fontWeight: '600', letterSpacing: 0.9, textTransform: 'uppercase' }}>
+              {r.window_hours}h digest
             </Text>
           </View>
-          <Text style={type.micro}>last {r.window_hours}h</Text>
         </View>
         <Text style={[type.title, { fontSize: 18, marginBottom: 3 }]}>{r.title}</Text>
         <Text style={type.small}>
@@ -59,13 +59,12 @@ export function DigestCard({ digest }: { digest: Digest | null }) {
           <View key={`${it.ticker}-${i}`} style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 8 }}>
             <View
               style={{
-                width: 7,
-                height: 7,
-                borderRadius: 4,
+                width: 6,
+                height: 6,
                 marginTop: 5,
                 marginRight: 10,
                 backgroundColor:
-                  it.priority <= 1 ? colors.red : it.priority === 2 ? colors.amber : colors.faint,
+                  it.priority <= 1 ? '#000000' : it.priority === 2 ? colors.tan : colors.border,
               }}
             />
             <View style={{ flex: 1 }}>
@@ -94,7 +93,7 @@ export function DigestCard({ digest }: { digest: Digest | null }) {
             borderTopColor: colors.border,
           })}
         >
-          <Text style={{ color: colors.accent, fontSize: 12.5, fontWeight: '600' }}>
+          <Text style={{ color: '#000000', fontSize: 11.5, fontWeight: '600', letterSpacing: 0.9, textTransform: 'uppercase' }}>
             {open ? 'Collapse' : `Show all ${items.length} items`}
           </Text>
         </Pressable>

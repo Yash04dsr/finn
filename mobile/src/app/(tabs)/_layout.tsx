@@ -1,19 +1,17 @@
 /**
- * Tabs layout — custom dark bottom tab bar (Feed, Chat, Companies, Settings).
- * Uses expo-router's vendored bottom-tabs tabBar render prop
- * ({ state, navigateToTab, insets }).
+ * Tabs layout — same bar as the web app: white ground, black top rule,
+ * uppercase tracked labels, a black tick on the active tab.
  */
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
-import { colors } from '../../../lib/theme';
 import { ChatIcon, CompaniesIcon, FeedIcon, SettingsIcon } from '../../../components/ui';
 
 const TABS = [
-  { name: 'index', label: 'Feed', Icon: FeedIcon },
-  { name: 'chat', label: 'Chat', Icon: ChatIcon },
-  { name: 'companies', label: 'Companies', Icon: CompaniesIcon },
-  { name: 'settings', label: 'Settings', Icon: SettingsIcon },
+  { name: 'index', label: 'BRIEF', Icon: FeedIcon },
+  { name: 'chat', label: 'ASK', Icon: ChatIcon },
+  { name: 'companies', label: 'COMPANIES', Icon: CompaniesIcon },
+  { name: 'settings', label: 'SETTINGS', Icon: SettingsIcon },
 ];
 
 export default function TabsLayout() {
@@ -26,17 +24,17 @@ export default function TabsLayout() {
           <View
             style={{
               flexDirection: 'row',
-              backgroundColor: 'rgba(13,18,27,0.97)',
+              backgroundColor: '#FFFFFF',
               borderTopWidth: 1,
-              borderTopColor: colors.border,
-              paddingBottom: Math.max(insets.bottom, 10),
-              paddingTop: 8,
+              borderTopColor: '#000000',
+              paddingBottom: Math.max(insets.bottom, 6),
+              paddingTop: 6,
             }}
           >
             {TABS.map((t) => {
               const route = state.routes.find((r) => r.name === t.name);
               const focused = activeName === t.name;
-              const color = focused ? colors.accent : colors.muted;
+              const color = focused ? '#000000' : '#808080';
               return (
                 <Pressable
                   key={t.name}
@@ -53,15 +51,26 @@ export default function TabsLayout() {
                   })}
                 >
                   <View style={{ height: 26, alignItems: 'center', justifyContent: 'center' }}>
+                    {focused ? (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: -8,
+                          width: 24,
+                          height: 3,
+                          backgroundColor: '#000000',
+                        }}
+                      />
+                    ) : null}
                     <t.Icon size={22} focused={focused} color={color} />
                   </View>
                   <Text
                     style={{
-                      fontSize: 10.5,
+                      fontSize: 9,
                       marginTop: 3,
-                      fontWeight: focused ? '700' : '500',
-                      color,
-                      letterSpacing: 0.2,
+                      fontWeight: '600',
+                      color: focused ? '#000000' : '#6B7280',
+                      letterSpacing: 1.1,
                     }}
                   >
                     {t.label}
@@ -73,8 +82,8 @@ export default function TabsLayout() {
         );
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Feed' }} />
-      <Tabs.Screen name="chat" options={{ title: 'Chat' }} />
+      <Tabs.Screen name="index" options={{ title: 'Brief' }} />
+      <Tabs.Screen name="chat" options={{ title: 'Ask' }} />
       <Tabs.Screen name="companies" options={{ title: 'Companies' }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
     </Tabs>

@@ -31,9 +31,9 @@ export default function Sparkline({ data, width = 72, height = 26, className = "
   const stroke = up ? "#1E6B4F" : "#B4442C";
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className={className} aria-hidden="true">
-      <path d={area} fill={stroke} opacity={0.09} />
-      <path d={path} fill="none" stroke={stroke} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className={className} aria-hidden="true">
+      <path d={area} fill={stroke} opacity={0.08} />
+      <path d={path} fill="none" stroke={stroke} strokeWidth={1.6} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

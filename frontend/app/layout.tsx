@@ -14,9 +14,8 @@ import TabBar from "@/components/TabBar";
 import SwRegister from "@/components/SwRegister";
 
 export const metadata: Metadata = {
-  title: "FINN — Investment Intelligence",
-  description:
-    "Personal investment intelligence agent: filings, volume anomalies and an end-of-day digest, ranked by what actually matters.",
+  title: "FINN",
+  description: "A brief you finish, graded against management's own words.",
   applicationName: "FINN",
   manifest: "/manifest.webmanifest",
   icons: {
@@ -42,9 +41,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-dvh antialiased">
-        {/* Center column on wide screens; native 1:1 on phones. */}
-        <div className="mx-auto w-full max-w-[480px]">{children}</div>
+      <body className="min-h-dvh antialiased md:bg-[#F5F1E8]">
+        {/* One phone-width column: native on phones, centred with margins on desktop. */}
+        <div className="mx-auto min-h-dvh w-full max-w-[480px] bg-white md:border-x md:border-[#E5E7EB]">{children}</div>
         <TabBar />
         <SwRegister />
       </body>

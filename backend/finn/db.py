@@ -96,6 +96,52 @@ CREATE TABLE IF NOT EXISTS cost_ledger (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS guidance_claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker TEXT NOT NULL,
+    doc_url TEXT NOT NULL,
+    period TEXT NOT NULL,            -- quarter of the call the statement was made on
+    kind TEXT NOT NULL,              -- revenue_growth | ebitda_margin | ebit_margin | pat_margin | other
+    metric TEXT NOT NULL,            -- the metric in management's words
+    lo REAL,
+    hi REAL,
+    unit TEXT DEFAULT '%',
+    horizon TEXT DEFAULT '',         -- when management said it would happen
+    quote TEXT NOT NULL,
+    speaker TEXT DEFAULT '',
+    chunk_id INTEGER,
+    version TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_claims_ticker ON guidance_claims(ticker, period);
+
+CREATE TABLE IF NOT EXISTS answer_cache (
+    key TEXT PRIMARY KEY,            -- ticker + normalised question + corpus version
+    ticker TEXT NOT NULL,
+    content TEXT NOT NULL,
+    citations TEXT NOT NULL,         -- JSON
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS verdicts (
+    alert_id INTEGER PRIMARY KEY,
+    ticker TEXT NOT NULL,
+    verdict TEXT NOT NULL,           -- no_impact | watch | changes_story
+    note TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS watchpoints (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker TEXT NOT NULL,
+    text TEXT NOT NULL,
+    kind TEXT DEFAULT '',            -- matches guidance kinds or a filing category
+    lo REAL,
+    hi REAL,
+    source_chunk INTEGER,
+    origin TEXT DEFAULT 'drafted',   -- drafted | investor
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -129,12 +175,14 @@ def _get_conn() -> sqlite3.Connection:
 
 def _migrate_schema(conn: sqlite3.Connection) -> None:
     """Apply additive migrations for databases created by earlier demo builds."""
-    migrations = {
-        "alerts": ("source_key", "TEXT DEFAULT ''"),
-        "digests": ("source_key", "TEXT DEFAULT ''"),
-        "cost_ledger": ("tier", "TEXT DEFAULT ''"),
-    }
-    for table, (column, ddl) in migrations.items():
+    migrations = [
+        ("alerts", "source_key", "TEXT DEFAULT ''"),
+        ("alerts", "event_at", "TEXT DEFAULT ''"),
+        ("quarterly", "depreciation", "REAL"),
+        ("digests", "source_key", "TEXT DEFAULT ''"),
+        ("cost_ledger", "tier", "TEXT DEFAULT ''"),
+    ]
+    for table, column, ddl in migrations:
         columns = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         if column not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
@@ -148,15 +196,20 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
     )
 
 
+_op_lock = threading.RLock()
+
+
 @contextmanager
 def db():
+    """One shared connection; the lock keeps worker threads from interleaving statements."""
     conn = _get_conn()
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
+    with _op_lock:
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
 
 def now_iso() -> str:
@@ -167,8 +220,25 @@ def now_iso() -> str:
 
 def upsert_filing(ticker: str, category: str, headline: str, body: str,
                   filed_at: str, source: str = "nse", is_demo: bool = False) -> bool:
-    """Insert or refresh a filing. Returns True only when it was newly inserted."""
+    """Insert or refresh a filing. Returns True only when it was newly inserted.
+
+    Sample-day filings are identified by ticker and headline alone, so moving
+    them to a fresh timestamp refreshes the row instead of adding a copy.
+    """
     with db() as c:
+        if is_demo:
+            row = c.execute(
+                "SELECT id FROM filings WHERE ticker=? AND headline=? AND is_demo=1"
+                " ORDER BY id DESC LIMIT 1",
+                (ticker, headline),
+            ).fetchone()
+            if row:
+                c.execute(
+                    "UPDATE filings SET category=CASE WHEN ?='unclassified' THEN category ELSE ? END,"
+                    " body=?, source=?, filed_at=? WHERE id=?",
+                    (category, category, body, source, filed_at, row["id"]),
+                )
+                return False
         existed = c.execute(
             "SELECT 1 FROM filings WHERE ticker=? AND headline=? AND filed_at=?",
             (ticker, headline, filed_at),
@@ -245,6 +315,10 @@ def search_chunks(ticker: str, query: str, doc_type: str | None = None,
             sql += " ORDER BY bm25(chunks_fts) LIMIT ?"
             args.append(limit)
             rows = c.execute(sql, args).fetchall()
+            if not rows and len(fts_q.split()) > 1:
+                # Every word rarely appears in one passage; retry with any word, ranked by relevance.
+                args[0] = _fts_escape(query, any_word=True)
+                rows = c.execute(sql, args).fetchall()
         except sqlite3.OperationalError:
             sql = "SELECT id, ticker, doc_type, doc_title, period, url, seq, '', text FROM chunks WHERE ticker=?"
             args = [ticker]
@@ -268,12 +342,18 @@ def search_chunks(ticker: str, query: str, doc_type: str | None = None,
     return [dict(r) for r in rows]
 
 
-def _fts_escape(query: str) -> str:
+_STOPWORDS = {"the", "a", "an", "of", "to", "in", "on", "for", "and", "or", "by", "with", "is",
+              "was", "what", "did", "does", "how", "about", "their", "they", "its"}
+
+
+def _fts_escape(query: str, any_word: bool = False) -> str:
     """Wrap each token in double quotes so punctuation never breaks MATCH syntax."""
     tokens = [t for t in query.replace('"', " ").replace("'", " ").split() if t]
+    if any_word:
+        tokens = [t for t in tokens if t.lower() not in _STOPWORDS and len(t) > 2] or tokens
     if not tokens:
         return '""'
-    return " ".join(f'"{t}"' for t in tokens)
+    return (" OR " if any_word else " ").join(f'"{t}"' for t in tokens)
 
 
 def ensure_fts() -> None:
@@ -362,10 +442,11 @@ def put_quarterly(ticker: str, rows: list[dict]) -> None:
     with db() as c:
         for r in rows:
             c.execute(
-                "INSERT OR REPLACE INTO quarterly(ticker, period, period_end, revenue, ebitda, pbt, pat, source)"
-                " VALUES(?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO quarterly(ticker, period, period_end, revenue, ebitda, pbt, pat,"
+                " depreciation, source) VALUES(?,?,?,?,?,?,?,?,?)",
                 (ticker, r["period"], r.get("period_end", ""), r.get("revenue"),
-                 r.get("ebitda"), r.get("pbt"), r.get("pat"), r.get("source", "screener")),
+                 r.get("ebitda"), r.get("pbt"), r.get("pat"), r.get("depreciation"),
+                 r.get("source", "screener")),
             )
 
 
@@ -381,18 +462,80 @@ def quarterly_series(ticker: str, limit: int = 8) -> list[dict]:
 # --- alerts / feed ---------------------------------------------------------------
 
 def add_alert(ticker: str, kind: str, payload: dict, priority: int, why: str = "",
-              source_key: str = "") -> int:
-    """Store one alert; a non-empty source_key makes repeated pipeline runs idempotent."""
+              source_key: str = "", event_at: str = "") -> int:
+    """Store one alert; a non-empty source_key makes repeated pipeline runs idempotent.
+
+    A rerun keeps the original alert id and read state and refreshes its event time.
+    """
+    event_at = event_at or event_time(kind, payload)
     with db() as c:
         cur = c.execute(
-            "INSERT OR IGNORE INTO alerts(ticker, kind, payload, priority, why, source_key)"
-            " VALUES(?,?,?,?,?,?)",
-            (ticker, kind, json.dumps(payload), priority, why, source_key),
+            "INSERT OR IGNORE INTO alerts(ticker, kind, payload, priority, why, source_key, event_at)"
+            " VALUES(?,?,?,?,?,?,?)",
+            (ticker, kind, json.dumps(payload), priority, why, source_key, event_at),
         )
         if cur.rowcount:
             return cur.lastrowid
-        row = c.execute("SELECT id FROM alerts WHERE source_key=?", (source_key,)).fetchone()
-        return int(row["id"]) if row else 0
+        row = c.execute("SELECT id, payload FROM alerts WHERE source_key=?", (source_key,)).fetchone()
+        if not row:
+            return 0
+        stored = json.loads(row["payload"])
+        if payload.get("filed_at"):
+            stored["filed_at"] = payload["filed_at"]
+        c.execute(
+            "UPDATE alerts SET event_at=?, payload=? WHERE id=?",
+            (event_at, json.dumps(stored), row["id"]),
+        )
+        return int(row["id"])
+
+
+def event_time(kind: str, payload: dict) -> str:
+    """When the underlying event happened: filing time, or the EOD bar's close (15:30 IST)."""
+    if payload.get("filed_at"):
+        return str(payload["filed_at"])
+    if payload.get("date"):
+        return f"{str(payload['date'])[:10]}T10:00:00+00:00"
+    return now_iso()
+
+
+def dedupe_alerts() -> int:
+    """Collapse duplicate announcement alerts left by earlier builds; backfill event times."""
+    removed = 0
+    with db() as c:
+        rows = c.execute("SELECT id, ticker, kind, payload, event_at FROM alerts ORDER BY id DESC").fetchall()
+        seen: set[tuple] = set()
+        for r in rows:
+            payload = json.loads(r["payload"])
+            key = (r["ticker"], r["kind"], payload.get("headline") or payload.get("date") or r["id"])
+            if key in seen:
+                c.execute("DELETE FROM alerts WHERE id=?", (r["id"],))
+                removed += 1
+                continue
+            seen.add(key)
+            if not r["event_at"]:
+                c.execute("UPDATE alerts SET event_at=? WHERE id=?",
+                          (event_time(r["kind"], payload), r["id"]))
+        filings = c.execute(
+            "SELECT id, ticker, headline FROM filings WHERE is_demo=1 ORDER BY id DESC"
+        ).fetchall()
+        seen_filings: set[tuple] = set()
+        for f in filings:
+            key = (f["ticker"], f["headline"])
+            if key in seen_filings:
+                c.execute("DELETE FROM filings WHERE id=?", (f["id"],))
+                removed += 1
+            seen_filings.add(key)
+    return removed
+
+
+def get_alert(alert_id: int) -> dict | None:
+    with db() as c:
+        row = c.execute("SELECT * FROM alerts WHERE id=?", (alert_id,)).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["payload"] = json.loads(d["payload"])
+    return d
 
 
 def alert_source_exists(source_key: str) -> bool:
@@ -404,14 +547,19 @@ def alert_source_exists(source_key: str) -> bool:
         ).fetchone() is not None
 
 
-def feed(since_hours: int = 24, include_read: bool = False) -> list[dict]:
+def feed(since_hours: int | None = None, include_read: bool = False) -> list[dict]:
+    """Alerts whose event happened inside the window, highest priority first."""
+    q = "SELECT * FROM alerts WHERE 1=1"
+    args: list = []
+    if since_hours:
+        cutoff = datetime.now(timezone.utc).timestamp() - since_hours * 3600
+        q += " AND event_at >= ?"
+        args.append(datetime.fromtimestamp(cutoff, timezone.utc).isoformat())
+    if not include_read:
+        q += " AND read=0"
+    q += " ORDER BY priority, event_at DESC LIMIT 200"
     with db() as c:
-        if include_read:
-            rows = c.execute("SELECT * FROM alerts ORDER BY priority, created_at DESC LIMIT 200").fetchall()
-        else:
-            rows = c.execute(
-                "SELECT * FROM alerts WHERE read=0 ORDER BY priority, created_at DESC LIMIT 200"
-            ).fetchall()
+        rows = c.execute(q, args).fetchall()
     out = []
     for r in rows:
         d = dict(r)
@@ -454,6 +602,30 @@ def latest_digest() -> dict | None:
     d = dict(row)
     d["rendered"] = json.loads(d["rendered"])
     return d
+
+
+# --- research answer cache -----------------------------------------------------------
+
+def corpus_version(ticker: str) -> str:
+    """Changes whenever new documents or new quarterly numbers arrive for a company."""
+    with db() as c:
+        chunks = c.execute("SELECT COUNT(*), COALESCE(MAX(id), 0) FROM chunks WHERE ticker=?", (ticker,)).fetchone()
+        quarter = c.execute("SELECT COALESCE(MAX(period_end), '') FROM quarterly WHERE ticker=?", (ticker,)).fetchone()
+    return f"{chunks[0]}:{chunks[1]}:{quarter[0]}"
+
+
+def cache_get(key: str, max_age_hours: int = 24) -> dict | None:
+    with db() as c:
+        row = c.execute(
+            "SELECT content, citations FROM answer_cache WHERE key=? AND created_at >= datetime('now', ?)",
+            (key, f"-{max_age_hours} hours")).fetchone()
+    return {"content": row["content"], "citations": json.loads(row["citations"])} if row else None
+
+
+def cache_put(key: str, ticker: str, content: str, citations: list[dict]) -> None:
+    with db() as c:
+        c.execute("INSERT OR REPLACE INTO answer_cache(key, ticker, content, citations) VALUES(?,?,?,?)",
+                  (key, ticker, content, json.dumps(citations)))
 
 
 # --- cost ledger ------------------------------------------------------------------

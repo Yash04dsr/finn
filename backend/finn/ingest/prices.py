@@ -15,16 +15,12 @@ def fetch_eod(ticker: str, days: int = 60) -> list[dict]:
     import yfinance as yf
 
     try:
-        df = yf.download(f"{ticker}.NS", period=f"{days}d", interval="1d",
-                         progress=False, auto_adjust=False)
+        # Ticker.history keeps state per instance, so it is safe to call from worker threads.
+        df = yf.Ticker(f"{ticker}.NS").history(period=f"{days}d", interval="1d", auto_adjust=False)
         if df is None or df.empty:
-            # try BSE
-            df = yf.download(f"{ticker}.BO", period=f"{days}d", interval="1d",
-                             progress=False, auto_adjust=False)
+            df = yf.Ticker(f"{ticker}.BO").history(period=f"{days}d", interval="1d", auto_adjust=False)
         if df is None or df.empty:
             return []
-        if hasattr(df.columns, "get_level_values") and df.columns.nlevels > 1:
-            df.columns = df.columns.get_level_values(0)
         out = []
         for idx, row in df.iterrows():
             out.append({
@@ -38,11 +34,15 @@ def fetch_eod(ticker: str, days: int = 60) -> list[dict]:
         return []
 
 
-def refresh_all_prices(days: int = 60) -> dict:
-    """Pull EOD bars for every tracked ticker into SQLite."""
+def refresh_all_prices(days: int = 60, tickers: list[str] | None = None) -> dict:
+    """Pull EOD bars for every tracked ticker into SQLite, a few tickers at a time."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    symbols = tickers or ALL_TICKERS
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = dict(zip(symbols, pool.map(lambda t: fetch_eod(t, days=days), symbols)))
     stats = {}
-    for t in ALL_TICKERS:
-        rows = fetch_eod(t, days=days)
+    for t, rows in results.items():
         for r in rows:
             db.put_price(t, r["date"], r["close"], r["volume"])
         stats[t] = len(rows)

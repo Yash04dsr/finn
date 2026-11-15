@@ -16,10 +16,46 @@ export function normalizeBaseUrl(raw: string): string {
   return url.replace(/\/+$/, '');
 }
 
+function isPrivateBaseUrl(raw: string): boolean {
+  try {
+    const host = new URL(normalizeBaseUrl(raw)).hostname.toLowerCase();
+    if (host === 'localhost' || host.endsWith('.local')) return true;
+    if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+    const match = host.match(/^172\.(\d+)\./);
+    if (!match) return false;
+    const second = Number(match[1]);
+    return second >= 16 && second <= 31;
+  } catch {
+    return false;
+  }
+}
+
 export async function loadBaseUrl(): Promise<string> {
   try {
-    const v = await AsyncStorage.getItem(BASE_URL_KEY);
-    return v ? normalizeBaseUrl(v) : DEFAULT_BASE_URL;
+    const stored = await AsyncStorage.getItem(BASE_URL_KEY);
+    const chosen = stored ? normalizeBaseUrl(stored) : DEFAULT_BASE_URL;
+    const storedHost = (() => {
+      try {
+        return new URL(chosen).hostname.toLowerCase();
+      } catch {
+        return '';
+      }
+    })();
+    const defaultHost = (() => {
+      try {
+        return new URL(DEFAULT_BASE_URL).hostname.toLowerCase();
+      } catch {
+        return '';
+      }
+    })();
+    const staleTunnel = storedHost.endsWith('.trycloudflare.com') || storedHost.endsWith('.loca.lt');
+    const staleLan = isPrivateBaseUrl(chosen) && storedHost !== defaultHost;
+    // Drop a saved address that cannot reach this session: an old Wi-Fi IP, or a tunnel that has closed.
+    if (chosen !== DEFAULT_BASE_URL && (staleLan || staleTunnel)) {
+      await AsyncStorage.setItem(BASE_URL_KEY, DEFAULT_BASE_URL);
+      return DEFAULT_BASE_URL;
+    }
+    return chosen;
   } catch {
     return DEFAULT_BASE_URL;
   }

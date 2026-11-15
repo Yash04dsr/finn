@@ -4,15 +4,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, getBaseUrl, ApiError } from '../../../lib/api';
 import { colors, radius, type } from '../../../lib/theme';
 import type { CompaniesResponse, QuoteRow } from '../../../lib/types';
+import { Wordmark } from '../../../components/Wordmark';
 import { ChangeBadge, ChevronRight, ErrorCard, ListSkeleton, SectionHeader } from '../../../components/ui';
 import { fmtPrice } from '../../../lib/format';
 
 export default function CompaniesScreen() {
-  const insets = useSafeAreaInsets();
   const [data, setData] = useState<CompaniesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,20 +51,16 @@ export default function CompaniesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingHorizontal: 16, paddingBottom: 110 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
-          <Text style={type.title}>Companies</Text>
-          <Text style={type.micro}>
-            {data ? `${data.portfolio.length} portfolio · ${data.adhoc.length} ad-hoc` : ''}
-          </Text>
-        </View>
-
+      <Wordmark />
+      <ScrollView contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: 110 }}>
         <View
           style={{
             backgroundColor: colors.surface,
             borderRadius: radius.lg,
             borderWidth: 1,
             borderColor: colors.border,
+            borderTopWidth: 2,
+            borderTopColor: '#000000',
             padding: 14,
             marginBottom: 18,
           }}
@@ -124,7 +119,7 @@ export default function CompaniesScreen() {
                 backgroundColor: colors.accent,
               })}
             >
-              <Text style={{ color: '#04130C', fontWeight: '700', fontSize: 13 }}>Open</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Open</Text>
             </Pressable>
           </View>
           {validation ? (
@@ -146,7 +141,7 @@ export default function CompaniesScreen() {
               <QuoteList rows={data.portfolio} />
             </View>
             <View>
-              <SectionHeader title="Ad-hoc research" hint={`${data.adhoc.length}`} />
+              <SectionHeader title="Research list and watchlist" hint={`${data.adhoc.length}`} />
               <QuoteList rows={data.adhoc} />
             </View>
           </>
@@ -164,6 +159,8 @@ function QuoteList({ rows }: { rows: QuoteRow[] }) {
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.border,
+        borderTopWidth: 2,
+        borderTopColor: '#000000',
         overflow: 'hidden',
       }}
     >
@@ -171,7 +168,7 @@ function QuoteList({ rows }: { rows: QuoteRow[] }) {
         <Pressable
           key={r.ticker}
           onPress={() => router.push({ pathname: '/company/[ticker]', params: { ticker: r.ticker } })}
-          android_ripple={{ color: 'rgba(255,255,255,0.04)' }}
+          android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
           style={({ pressed }) => ({
             opacity: pressed ? 0.8 : 1,
             flexDirection: 'row',
@@ -182,29 +179,12 @@ function QuoteList({ rows }: { rows: QuoteRow[] }) {
             borderTopColor: colors.border,
           })}
         >
-          <View
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: 12,
-              backgroundColor: colors.surface2,
-              borderWidth: 1,
-              borderColor: colors.border,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 11,
-            }}
-          >
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 10, letterSpacing: 0.2 }} numberOfLines={2}>
-              {r.ticker}
-            </Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[type.h3, { fontSize: 13.5 }]}>{r.ticker}</Text>
-            <Text style={[type.small, { fontVariant: ['tabular-nums'], fontSize: 12 }]}>
-              {fmtPrice(r.close)}
-            </Text>
-          </View>
+          <Text style={{ flex: 1, color: colors.text, fontWeight: '700', fontSize: 13.5, letterSpacing: 0.4 }}>
+            {r.ticker}
+          </Text>
+          <Text style={[type.small, { fontVariant: ['tabular-nums'], marginRight: 8 }]}>
+            {fmtPrice(r.close)}
+          </Text>
           <ChangeBadge pct={r.change_pct} small />
           <View style={{ marginLeft: 10 }}>
             <ChevronRight />

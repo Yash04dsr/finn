@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from .. import db
 from ..llm import routing
+from ..llm.chat_guard import plain_voice
 from ..tools import metrics as metrics_mod
 
 log = logging.getLogger("finn.enrich")
@@ -72,11 +74,38 @@ async def _one_liner(filing: dict, facts: dict | None) -> str:
             {"role": "user", "content": prompt},
         ], scope="enrichment", max_tokens=60, temperature=0.2)
         clean = routing.strip_think(raw).strip()
-        if clean:
-            return clean.splitlines()[0][:200]
+        line = plain_voice(clean.splitlines()[0][:200]) if clean else ""
+        if is_clean_sentence(line):
+            return line
     except Exception as exc:
         log.warning("one-liner failed: %s", exc)
     return _deterministic_summary(filing, facts)
+
+
+_COUNTER = re.compile(r"\b(?:word|words|count)\b\s*[:(]|\(\s*\d+\s*words?\s*\)|\d+\s*words\b",
+                      re.IGNORECASE)
+
+
+_DANGLING = {
+    "to", "of", "on", "at", "by", "for", "from", "with", "and", "or", "effective", "the", "a",
+    "an", "approved", "approves", "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+}
+
+
+def is_clean_sentence(line: str) -> bool:
+    """A one-liner fit to show an investor: a real sentence, no fragments or counters."""
+    line = (line or "").strip()
+    words = line.split()
+    if len(words) < 6:
+        return False
+    if words[-1].strip(".,;:").lower() in _DANGLING:
+        return False
+    if _COUNTER.search(line):
+        return False
+    if line[0] in "\"'`(" or line.count('"') % 2 or line.count("(") != line.count(")"):
+        return False
+    return True
 
 
 def _deterministic_summary(filing: dict, facts: dict | None) -> str:
@@ -106,13 +135,15 @@ def _deterministic_summary(filing: dict, facts: dict | None) -> str:
 
 
 def public_line(text: str, fallback: str = "") -> str:
-    """Keep a stored sentence only when it is not model scratch text."""
+    """Keep a stored sentence only when it is a clean, investor-facing line."""
     cleaned = routing.strip_think(text or "").strip()
-    if not cleaned:
-        cleaned = routing.strip_think(fallback or "").strip()
-    if not cleaned:
-        return "Corporate filing received; a reliable summary is unavailable."
-    return cleaned.splitlines()[0][:200]
+    line = plain_voice(cleaned.splitlines()[0][:200]) if cleaned else ""
+    if is_clean_sentence(line):
+        return line
+    fallback_line = routing.strip_think(fallback or "").strip()
+    if fallback_line:
+        return plain_voice(fallback_line.splitlines()[0][:200])
+    return "Corporate filing received; a reliable summary is unavailable."
 
 
 def sanitize_stored_narratives() -> int:
@@ -179,8 +210,91 @@ def _format_number(value: int | float) -> str:
     return f"{value:,.0f}"
 
 
+BIO_PROMPT = """From this exchange filing about a management change, describe the person who is joining or being appointed.
+
+Return JSON: {"name": str or null, "role": str, "background": "<two short sentences: previous employers and roles, years of experience, education if stated>", "evidence": "<exact words copied from the text that support the background, at most 30 words>"}
+Use only the text given. If the text has no profile of the incoming person, return {"name": null}."""
+
+_PROFILE = re.compile(r"brief profile|profile of|experience|qualification|prior to|previously|has been associated|"
+                      r"joined|career", re.I)
+
+
+def _profile_text(pdf_text: str) -> str:
+    """The part of a filing that profiles the appointee (LODR Reg 30 requires a brief profile)."""
+    paras = [p.strip() for p in re.split(r"\n\s*\n|\n(?=[A-Z][a-z]+ [A-Z])", pdf_text) if len(p.strip()) > 60]
+    hits = [p for p in paras if _PROFILE.search(p)]
+    return "\n\n".join((hits or paras)[:6])[:4000]
+
+
+async def _bio_from_text(text: str, headline: str, source: dict) -> dict | None:
+    if not text.strip():
+        return None
+    try:
+        raw = await routing.chat(routing.Tier.FAST, [
+            {"role": "system", "content": BIO_PROMPT},
+            {"role": "user", "content": f"Filing headline: {headline}\n\nText:\n{text}"},
+        ], scope="enrichment", json_mode=True, max_tokens=400, temperature=0.0)
+        data = json.loads(raw[raw.index("{"): raw.rindex("}") + 1])
+    except Exception as exc:
+        log.warning("bio extraction failed: %s", exc)
+        return None
+    if not data.get("name"):
+        return None
+    evidence = re.sub(r"\s+", " ", str(data.get("evidence") or "")).strip().lower()
+    haystack = re.sub(r"\s+", " ", text).lower()
+    # The background must rest on words that are really in the document.
+    if len(evidence.split()) < 5 or evidence[:60] not in haystack:
+        return None
+    return {"name": data["name"], "role": data.get("role", ""),
+            "background": plain_voice(str(data.get("background") or ""))[:400],
+            "evidence": data.get("evidence"), **source}
+
+
+def _filing_pdf_text(url: str) -> str:
+    """Download an exchange filing attachment and return its text (best effort)."""
+    import io
+
+    import httpx
+    from pypdf import PdfReader
+
+    try:
+        resp = httpx.get(url, timeout=20, follow_redirects=True,
+                         headers={"User-Agent": "Mozilla/5.0 (Macintosh) Chrome/124.0"})
+        resp.raise_for_status()
+        reader = PdfReader(io.BytesIO(resp.content))
+        return "\n".join((page.extract_text() or "") for page in reader.pages[:8])
+    except Exception as exc:
+        log.warning("filing download failed %s: %s", url, exc)
+        return ""
+
+
 async def _exec_bio(filing: dict) -> dict | None:
-    """Professional background of the named executive. Push-side enrichment only."""
+    """Background of the incoming executive, from the filing's mandated profile first,
+    then the company's annual report, then the headline alone."""
+    import asyncio
+
+    headline = filing.get("headline", "")
+    body = filing.get("body") or ""
+    if body.startswith("http"):
+        text = await asyncio.to_thread(_filing_pdf_text, body)
+        bio = await _bio_from_text(_profile_text(text), headline,
+                                   {"source": "Exchange filing (profile required under SEBI LODR)", "source_url": body})
+        if bio:
+            return bio
+    ticker = filing.get("ticker")
+    names = re.findall(r"(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})", headline)
+    if ticker and names:
+        hits = db.search_chunks(ticker, names[-1], doc_type="annual_report", limit=3)
+        if hits:
+            bio = await _bio_from_text("\n\n".join(h["text"] for h in hits), headline,
+                                       {"source": f"{hits[0]['doc_title']}", "source_url": hits[0].get("url", "")})
+            if bio:
+                return bio
+    return await _exec_bio_from_headline(filing)
+
+
+async def _exec_bio_from_headline(filing: dict) -> dict | None:
+    """Last resort: name and role from the headline, with no invented background."""
     headline = filing.get("headline", "")
     prompt = (
         f"From this exchange filing headline, identify the incoming executive (the person joining):\n"
@@ -200,6 +314,6 @@ async def _exec_bio(filing: dict) -> dict | None:
         if not data.get("name"):
             return None
         return {"name": data["name"], "role": data.get("role", ""),
-                "background": data.get("background", "")}
+                "background": data.get("background", ""), "source": "Filing headline only"}
     except Exception:
         return None

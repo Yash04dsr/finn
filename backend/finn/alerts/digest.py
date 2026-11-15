@@ -62,6 +62,29 @@ def compose_digest(enriched: list[dict], threshold_alerts: list[dict],
     }
 
 
+def compose_from_alerts(alerts: list[dict], hours: int = DEFAULT_WINDOW_HOURS) -> dict:
+    """Build the digest for any window from stored alerts, so the brief matches the feed."""
+    enriched: list[dict] = []
+    threshold: list[dict] = []
+    for a in alerts:
+        p = a.get("payload") or {}
+        if a["kind"] == "announcement":
+            enriched.append({
+                "ticker": a["ticker"],
+                "category": p.get("category", "unclassified"),
+                "headline": p.get("headline", ""),
+                "summary": p.get("summary", ""),
+                "priority": a.get("priority", 4),
+                "filed_at": p.get("filed_at") or a.get("event_at") or "",
+            })
+        elif a["kind"] in ("volume_spike", "price_move"):
+            threshold.append({"ticker": a["ticker"], "kind": a["kind"],
+                              "payload": p, "priority": a.get("priority", 3)})
+    digest = compose_digest(enriched, threshold, hours=hours)
+    digest["is_sample"] = any((a.get("payload") or {}).get("is_sample") for a in alerts)
+    return digest
+
+
 def _threshold_headline(a: dict) -> str:
     p = a.get("payload", {})
     if a["kind"] == "volume_spike":

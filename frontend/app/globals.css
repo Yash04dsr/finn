@@ -1,22 +1,22 @@
 /* FINN — Swiss International Style.
    Black on white, Helvetica, square corners, 2px top rules instead of cards.
-   Grid discipline: information ranks by weight and position, never decoration.
+   Bottle green and oxblood are reserved for up/down numbers and Kept/Missed.
    Layering: base < components < utilities, so Tailwind utilities can always
    override these defaults (unlayered CSS would silently beat every utility). */
 @import "tailwindcss";
 
 @layer base {
   :root {
-    --swiss-black: #000000;
-    --swiss-white: #ffffff;
-    --swiss-paper: #f5f1e8; /* alternate section bands */
-    --swiss-grey: #808080; /* dividers and disabled states only, never text */
-    --swiss-tan: #b38b6d; /* sparing accent rules and hovers, never text */
-    --swiss-text: #4b5563; /* secondary text */
-    --swiss-rule: #e5e7eb; /* 1px section dividers */
-    /* data semantics (the one concession to finance convention) */
-    --swiss-pos: #1e6b4f;
-    --swiss-neg: #b4442c;
+    --ink: #000000;
+    --paper: #ffffff;
+    --sand: #f5f1e8; /* quiet bands: quotes, sample-day notes */
+    --tan: #b38b6d; /* rules and pending states, never text */
+    --muted: #4b5563; /* secondary text, 7.5:1 on white */
+    --rule: #e5e7eb;
+    --pos: #1e6b4f;
+    --neg: #b4442c;
+    --tabbar-h: 60px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   * {
@@ -25,37 +25,48 @@
 
   html,
   body {
-    background: var(--swiss-white);
-    color: var(--swiss-black);
+    background: var(--paper);
+    color: var(--ink);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
   }
 
   ::selection {
-    background: rgba(0, 0, 0, 0.85);
-    color: var(--swiss-white);
+    background: var(--ink);
+    color: var(--paper);
   }
 
   body {
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    line-height: 1.6;
+    font-size: 15px;
+    line-height: 1.5;
     overscroll-behavior-y: none;
+    caret-color: var(--ink);
   }
 
   button {
     font-family: inherit;
     color: inherit;
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
-
-  /* Keyboard focus ring — visible on Tab, never on mouse click (UX.md #7). */
-  :focus-visible {
-    outline: 2px solid #000000;
-    outline-offset: 3px;
+  button:disabled {
+    cursor: default;
   }
 
-  button:focus:not(:focus-visible) {
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Keyboard focus ring — visible on Tab, never on mouse click. */
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+  button:focus:not(:focus-visible),
+  a:focus:not(:focus-visible) {
     outline: none;
   }
 
@@ -63,38 +74,117 @@
   textarea,
   select {
     font-family: inherit;
-    color: var(--swiss-black);
+    color: var(--ink);
     background: transparent;
+    border-radius: 0;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: #6b7280;
   }
 
   input[type="time"]::-webkit-calendar-picker-indicator {
     filter: invert(0.35);
   }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  }
 }
 
 @layer components {
-  /* ── Primitives ─────────────────────────────────────────────────────────── */
-  /* Thin 2px black top rules replace card borders and shadows. */
-  .card {
-    background: var(--swiss-white);
-    border: 1px solid var(--swiss-rule);
-    border-top: 2px solid var(--swiss-black);
-    border-radius: 0;
-    transition: border-color 200ms ease;
-  }
-  .card:hover {
-    border-top-color: var(--swiss-tan);
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 
-  .press {
-    transition: transform 0.12s ease, background-color 0.12s ease, border-color 0.12s ease;
+  .display {
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
-  .press:active {
-    transform: scale(0.98);
+
+  /* Section heading: small caps-style label that names what follows. */
+  .label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    line-height: 1.3;
   }
 
   .muted {
-    color: var(--swiss-text);
+    color: var(--muted);
+  }
+
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-top: 2px solid var(--ink);
+    border-radius: 0;
+  }
+
+  .rule {
+    border-top: 1px solid var(--rule);
+  }
+
+  /* Buttons: square, 44px minimum, label names the outcome. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease;
+  }
+  .btn-primary {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #1f2937;
+  }
+  .btn-secondary {
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.04);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+  }
+
+  /* Text link with a visible, offset underline. */
+  .link {
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: rgba(0, 0, 0, 0.35);
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+  .link:hover {
+    text-decoration-color: var(--ink);
+  }
+
+  .press {
+    transition:
+      transform 0.12s ease,
+      background-color 0.12s ease,
+      opacity 0.12s ease;
+  }
+  .press:active {
+    transform: scale(0.985);
   }
 
   /* Square micro-labels: uppercase, letter-spaced — never rounded pills. */
@@ -103,27 +193,25 @@
     align-items: center;
     gap: 5px;
     border-radius: 0;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.09em;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     line-height: 1;
-    padding: 4px 7px;
+    padding: 4px 6px;
     white-space: nowrap;
   }
 
-  .eyebrow {
-    font-size: 0.875rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--swiss-text);
+  .field {
+    min-height: 44px;
+    width: 100%;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    padding: 0 12px;
+    font-size: 16px; /* iOS will not zoom a 16px field */
+    outline: none;
   }
-
-  .lead-bar {
-    width: 3px;
-    border-radius: 0;
-    flex: none;
-    align-self: stretch;
+  .field:focus {
+    border-color: var(--ink);
   }
 
   /* ── Skeleton shimmer ─────────────────────────────────────────────────── */
@@ -138,38 +226,8 @@
     position: absolute;
     inset: 0;
     transform: translateX(-100%);
-    background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.08), transparent);
+    background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.06), transparent);
     animation: shimmer 1.4s infinite;
-  }
-
-  /* ── Sheet (slide-up detail) ────────────────────────────────────────────── */
-  .sheet-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    background: rgba(0, 0, 0, 0.4);
-    animation: fadeIn 0.16s ease;
-  }
-  .sheet-panel {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 51;
-    margin: 0 auto;
-    max-width: 480px;
-    background: var(--swiss-white);
-    border: 1px solid var(--swiss-rule);
-    border-top: 2px solid var(--swiss-black);
-    border-bottom: none;
-    border-radius: 0;
-    max-height: 88vh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    animation: slideUp 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
   }
 
   /* ── Streaming caret ──────────────────────────────────────────────────── */
@@ -179,37 +237,65 @@
     height: 14px;
     margin-left: 2px;
     vertical-align: text-bottom;
-    background: var(--swiss-black);
+    background: var(--ink);
     animation: blink 0.9s steps(2, start) infinite;
   }
 
-  /* ── Tool activity pulse ──────────────────────────────────────────────── */
   .pulse-dot {
+    display: inline-block;
     width: 6px;
     height: 6px;
-    border-radius: 0;
-    background: var(--swiss-tan);
+    flex: none;
+    background: var(--ink);
     animation: pulse 1.1s ease-in-out infinite;
   }
 
   /* ── Markdown-lite ──────────────────────────────────────────────────────── */
   .fin-p {
-    margin: 0 0 8px;
+    margin: 0 0 10px;
   }
   .fin-p:last-child {
     margin-bottom: 0;
   }
   .fin-li {
-    margin: 3px 0;
+    margin: 4px 0;
   }
   .fin-ul {
-    margin: 4px 0 8px;
+    margin: 4px 0 10px;
     padding-left: 18px;
     list-style: square;
   }
   .fin-strong {
-    color: var(--swiss-black);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .cite {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    margin: 0 1px;
+    padding: 0 4px;
+    border: 1px solid var(--ink);
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1;
+    vertical-align: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cite:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  /* Invisible hit area so an 18px marker is still a 30px tap target. */
+  a.cite {
+    position: relative;
+  }
+  a.cite::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
   }
 
   /* ── Sliders — square thumbs ──────────────────────────────────────────── */
@@ -219,45 +305,38 @@
     width: 100%;
     height: 2px;
     border-radius: 0;
-    background: var(--swiss-black);
+    background: var(--ink);
     outline: none;
   }
   input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     border-radius: 0;
-    background: var(--swiss-black);
+    background: var(--ink);
     border: none;
     cursor: pointer;
   }
 
-  /* ── Toast ──────────────────────────────────────────────────────────────── */
+  /* ── Toast: sits above the tab bar, wraps on narrow screens ─────────────── */
   .toast {
     position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: calc(84px + env(safe-area-inset-bottom));
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 12px);
     z-index: 60;
-    background: var(--swiss-black);
-    border: 1px solid var(--swiss-black);
-    color: var(--swiss-white);
-    font-size: 12px;
-    letter-spacing: 0.05em;
-    padding: 10px 16px;
+    margin: 0 auto;
+    max-width: 456px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 14px;
+    padding: 12px 14px;
     border-radius: 0;
-    white-space: nowrap;
-    animation: fadeIn 0.18s ease;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  }
-  .toast-err {
-    background: var(--swiss-neg);
-    border-color: var(--swiss-neg);
-    color: var(--swiss-white);
+    animation: rise 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
   }
 
-  /* Hide scrollbar on horizontal chip rows */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -273,21 +352,13 @@
     transform: translateX(100%);
   }
 }
-@keyframes slideUp {
+@keyframes rise {
   from {
-    transform: translateY(6%);
-    opacity: 0.6;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-@keyframes fadeIn {
-  from {
+    transform: translateY(8px);
     opacity: 0;
   }
   to {
+    transform: translateY(0);
     opacity: 1;
   }
 }
@@ -300,20 +371,19 @@
   0%,
   100% {
     opacity: 1;
-    transform: scale(1);
   }
   50% {
-    opacity: 0.35;
-    transform: scale(0.72);
+    opacity: 0.25;
   }
 }
 
 /* Reduced motion must beat everything, so it stays unlayered. */
 @media (prefers-reduced-motion: reduce) {
-  .card,
-  .press,
-  .toast {
-    transition: none;
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

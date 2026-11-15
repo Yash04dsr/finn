@@ -5,12 +5,19 @@
 import { fetch as expoFetch } from 'expo/fetch';
 import type {
   Alert,
+  Brief,
   ChatFrame,
   CompaniesResponse,
   CompanyDetail,
   Costs,
+  Coverage,
   Digest,
+  Ledger,
+  Preparing,
   Settings,
+  Verdict,
+  VerdictLogRow,
+  Watchpoint,
 } from './types';
 
 export class ApiError extends Error {
@@ -72,7 +79,7 @@ export const api = {
       method: 'GET',
     }),
 
-  digestLatest: () => request<Digest>('/api/digest/latest'),
+  digestLatest: (hours = 24) => request<Digest>(`/api/digest/latest?hours=${hours}`),
 
   companies: () => request<CompaniesResponse>('/api/companies'),
 
@@ -107,7 +114,52 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     }),
+
+  brief: (hours: number) => request<Brief>(`/api/brief?hours=${hours}`),
+
+  briefSeen: () => post<{ last_look: string }>('/api/brief/seen', {}),
+
+  verdict: (alertId: number, verdict: Verdict, muteCategory = false) =>
+    post<{ alert_id: number; verdict: Verdict; muted_category: string | null }>(
+      `/api/alerts/${alertId}/verdict`,
+      { verdict, mute_category: muteCategory },
+    ),
+
+  verdicts: () => request<{ verdicts: VerdictLogRow[] }>('/api/verdicts'),
+
+  alert: (alertId: number) => request<Alert>(`/api/alerts/${alertId}`),
+
+  ledger: (ticker: string) =>
+    request<Ledger>(`/api/company/${encodeURIComponent(ticker)}/ledger`, undefined, 90000),
+
+  coverage: (ticker: string) =>
+    request<{ coverage: Coverage; preparing: Preparing | null }>(
+      `/api/company/${encodeURIComponent(ticker)}/coverage`,
+    ),
+
+  addWatchpoint: (ticker: string, text: string) =>
+    post<Watchpoint>(`/api/company/${encodeURIComponent(ticker)}/watchpoints`, { text }),
+
+  deleteWatchpoint: (ticker: string, id: number) =>
+    request<{ ok: boolean }>(`/api/company/${encodeURIComponent(ticker)}/watchpoints/${id}`, {
+      method: 'DELETE',
+    }),
+
+  watch: (ticker: string) => post<{ watchlist: string[] }>('/api/watchlist', { ticker }),
+
+  unwatch: (ticker: string) =>
+    request<{ watchlist: string[] }>(`/api/watchlist/${encodeURIComponent(ticker)}`, {
+      method: 'DELETE',
+    }),
 };
+
+function post<T>(path: string, body: unknown, timeoutMs = 15000): Promise<T> {
+  return request<T>(
+    path,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    timeoutMs,
+  );
+}
 
 // --- Chat SSE ------------------------------------------------------------------
 

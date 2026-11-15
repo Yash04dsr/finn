@@ -1,6 +1,6 @@
 /**
- * CHAT — SSE streaming with expo/fetch, tool-activity chips, thinking trace,
- * markdown-lite answers with citation chips, graceful non-stream fallback.
+ * ASK — grounded questions about any listed company.
+ * Answers come from primary documents; every [n] marker opens the cited source.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -8,16 +8,17 @@ import {
   Platform,
   Pressable,
   ScrollView as RNScrollView,
+  ScrollViewInstance,
   Text,
   TextInput,
   View,
-  ScrollViewInstance,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { chatOnce, getBaseUrl, streamChat } from '../../../lib/api';
-import { colors, radius, type } from '../../../lib/theme';
-import type { ChatFrame } from '../../../lib/types';
+import { chatOnce, streamChat } from '../../../lib/api';
+import { colors, type } from '../../../lib/theme';
+import { openSource } from '../../../lib/open';
+import type { ChatFrame, Citation, Receipt } from '../../../lib/types';
 import { MarkdownLite } from '../../../components/MarkdownLite';
 import { SendIcon, Spinner, StopIcon } from '../../../components/ui';
 
@@ -25,496 +26,298 @@ interface Msg {
   id: string;
   role: 'user' | 'finn';
   text: string;
-  citations?: string[];
+  citations?: Citation[];
+  receipt?: Receipt;
   pending?: boolean;
-  streamFailed?: boolean;
+  failed?: boolean;
 }
 
-const SUGGESTIONS_BASE = [
-  'Narrative vs numbers',
-  'Bull vs bear case',
-  'What did management guide?',
-  'Cash quality check',
+const STARTERS = [
+  'Did Persistent deliver what management promised?',
+  'What did Crompton guide for this year?',
+  'Bull and bear case for Vedanta from its filings',
+  'What moved in my portfolio today?',
 ];
 
-let msgSeq = 0;
-const nextId = () => `m${++msgSeq}-${Date.now().toString(36)}`;
+const DOC_LABEL: Record<string, string> = {
+  transcript: 'Call transcript',
+  annual_report: 'Annual report',
+  results_filing: 'Results presentation',
+  metric: 'Reported numbers',
+};
 
-export default function ChatScreen() {
-  const params = useLocalSearchParams<{ ticker?: string; filing?: string }>();
-  const ticker = typeof params.ticker === 'string' ? params.ticker : undefined;
-  const filingId = params.filing ? Number(params.filing) : undefined;
+let seq = 0;
+const nextId = () => `m${++seq}-${Date.now().toString(36)}`;
+
+export default function AskScreen() {
+  const params = useLocalSearchParams<{ ticker?: string; filing?: string; q?: string }>();
   const insets = useSafeAreaInsets();
-
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
-  const [toolChips, setToolChips] = useState<string[]>([]);
-  const [thinking, setThinking] = useState<string[]>([]);
-  const [showThinking, setShowThinking] = useState(true);
-  const [sessionId, setSessionId] = useState<string>('');
-  const [tickerContext, setTickerContext] = useState<string | undefined>(ticker);
-  const [error, setError] = useState<string | null>(null);
-  const [prefilled, setPrefilled] = useState(false);
-
+  const [status, setStatus] = useState('');
+  const [sessionId, setSessionId] = useState('');
+  const [ticker, setTicker] = useState<string | undefined>(params.ticker);
+  const [filingId, setFilingId] = useState<number | undefined>(params.filing ? Number(params.filing) : undefined);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<RNScrollView | null>(null) as React.MutableRefObject<ScrollViewInstance | null>;
 
-  // Stable per-install chat session id.
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const { getOrCreateSessionId } = await import('../../../lib/store');
-      const id = await getOrCreateSessionId();
-      if (alive) setSessionId(id);
-    })();
-    return () => {
-      alive = false;
-    };
+  const newSession = useCallback(async (fresh = false) => {
+    const { getOrCreateSessionId } = await import('../../../lib/store');
+    const base = await getOrCreateSessionId();
+    setSessionId(fresh ? `${base.slice(0, 40)}-${Date.now().toString(36)}` : base);
   }, []);
 
-  // Query-param context: prefill (not auto-send) a filing question.
   useEffect(() => {
-    if (prefilled) return;
-    if (ticker) {
-      setTickerContext(ticker);
-      if (filingId) {
-        setInput(`What should I know about the latest ${ticker} filing?`);
-      }
-      setPrefilled(true);
-    }
-  }, [ticker, filingId, prefilled]);
+    void newSession();
+  }, [newSession]);
 
-  const suggestions = SUGGESTIONS_BASE;
+  // Arriving from an alert: carry its company and filing, and pre-fill the question.
+  useEffect(() => {
+    if (params.ticker) setTicker(params.ticker);
+    if (params.filing) setFilingId(Number(params.filing));
+    if (params.q) setInput(params.q);
+  }, [params.ticker, params.filing, params.q]);
 
   const send = useCallback(
     async (raw: string) => {
       const text = raw.trim();
       if (!text || streaming) return;
       setInput('');
-      setError(null);
-      setToolChips([]);
-      setThinking([]);
-      setShowThinking(true);
-
-      const userMsg: Msg = { id: nextId(), role: 'user', text };
+      setStatus('');
       const finnId = nextId();
-      const finnMsg: Msg = { id: finnId, role: 'finn', text: '', pending: true };
-      setMessages((m) => [...m, userMsg, finnMsg]);
+      setMessages((m) => [...m, { id: nextId(), role: 'user', text }, { id: finnId, role: 'finn', text: '', pending: true }]);
       setStreaming(true);
-
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-
-      const appendFinn = (patch: (m: Msg) => Msg) =>
-        setMessages((m) => m.map((x) => (x.id === finnId ? patch(x) : x)));
+      const patch = (fn: (m: Msg) => Msg) => setMessages((ms) => ms.map((x) => (x.id === finnId ? fn(x) : x)));
 
       const onFrame = (f: ChatFrame) => {
-        if (f.type === 'tool') {
-          const name = (f.tool_name || 'tool').replace(/_/g, ' ');
-          setToolChips((c) => (c.includes(name) ? c : [...c, name]));
-        } else if (f.type === 'thinking') {
-          if (f.content) setThinking((t) => [...t, f.content as string]);
-        } else if (f.type === 'model') {
-          if (f.content) appendFinn((m) => ({ ...m, text: m.text + f.content }));
+        if (f.type === 'route') {
+          if (f.lane === 'research' && f.ticker) {
+            setTicker(f.ticker);
+            setStatus(`Answering from ${f.ticker}'s filings`);
+          }
+        } else if (f.type === 'tool' && f.tool_name) {
+          setStatus(f.tool_name);
         } else if (f.type === 'final') {
-          appendFinn((m) => ({
-            ...m,
-            text: f.content ?? m.text,
-            pending: false,
-            citations: extractCitations(f.content ?? m.text),
-          }));
+          patch((m) => ({ ...m, text: f.content || m.text, citations: f.citations ?? [], receipt: f.receipt, pending: false }));
         } else if (f.type === 'error') {
-          appendFinn((m) => ({
-            ...m,
-            pending: false,
-            text: m.text || `FINN hit an error: ${f.content ?? 'unknown'}`,
-            streamFailed: true,
-          }));
+          patch((m) => ({ ...m, pending: false, failed: true, text: f.content ?? 'FINN could not answer that.' }));
         }
       };
 
+      const req = { message: text, session_id: sessionId || undefined, ticker, filing_id: filingId };
       try {
-        const result = await streamChat(
-          { message: text, session_id: sessionId || undefined, ticker: tickerContext, filing_id: filingId },
-          { onFrame, signal: ctrl.signal },
-        );
+        const result = await streamChat(req, { onFrame, signal: ctrl.signal });
         if (result === 'fallback') {
-          // Graceful degradation: plain POST, render only the final answer.
-          const frames = await chatOnce(
-            { message: text, session_id: sessionId || undefined, ticker: tickerContext, filing_id: filingId },
-            ctrl.signal,
-          );
-          for (const f of frames) onFrame(f);
-          if (!frames.some((f) => f.type === 'final' || f.type === 'error')) {
-            appendFinn((m) => ({ ...m, pending: false, text: m.text || 'No answer received.' }));
-          }
+          for (const f of await chatOnce(req, ctrl.signal)) onFrame(f);
         }
-        // Ensure pending cleared even if server never sent final.
-        setMessages((ms) =>
-          ms.map((m) =>
-            m.id === finnId && !m.text && m.pending
-              ? { ...m, pending: false, text: 'No answer received from FINN.', streamFailed: true }
-              : m,
-          ),
-        );
-      } catch (e) {
-        appendFinn((m) =>
-          m.pending
-            ? {
-                ...m,
-                pending: false,
-                text: `Cannot reach the backend at ${getBaseUrl()}.`,
-                streamFailed: true,
-              }
-            : m,
-        );
-        setError(e instanceof Error ? e.message : 'request failed');
+      } catch {
+        patch((m) => ({ ...m, pending: false, failed: true, text: 'FINN could not be reached. Check the connection and try again.' }));
       } finally {
+        setMessages((ms) =>
+          ms.map((m) => (m.id === finnId && m.pending ? { ...m, pending: false, failed: true, text: m.text || 'No answer came back. Try again.' } : m)),
+        );
         setStreaming(false);
-        setToolChips([]);
+        setStatus('');
+        setFilingId(undefined);
         abortRef.current = null;
       }
     },
-    [streaming, sessionId, tickerContext, filingId],
+    [streaming, sessionId, ticker, filingId],
   );
 
-  const stop = useCallback(() => {
+  const stop = () => {
     abortRef.current?.abort();
-    abortRef.current = null;
     setStreaming(false);
-    setMessages((ms) =>
-      ms.map((m) => (m.pending ? { ...m, pending: false, text: m.text || 'Stopped.' } : m)),
-    );
-  }, []);
+    setMessages((ms) => ms.map((m) => (m.pending ? { ...m, pending: false, text: m.text || 'Stopped.' } : m)));
+  };
 
-  // Auto-scroll to bottom on new content.
+  const reset = () => {
+    stop();
+    setMessages([]);
+    setTicker(undefined);
+    setFilingId(undefined);
+    void newSession(true);
+  };
+
   useEffect(() => {
     const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
     return () => clearTimeout(t);
-  }, [messages, thinking.length, toolChips.length]);
-
-  const empty = messages.length === 0;
+  }, [messages, status]);
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-    >
-      {/* header */}
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View
         style={{
-          paddingTop: insets.top + 10,
+          paddingTop: insets.top + 8,
           paddingHorizontal: 16,
           paddingBottom: 10,
           borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-          backgroundColor: colors.bg,
+          borderBottomColor: '#000000',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={type.title}>FINN</Text>
-            {tickerContext ? (
-              <Pressable
-                onPress={() => setTickerContext(undefined)}
-                style={{
-                  backgroundColor: colors.accentDim,
-                  borderRadius: 999,
-                  paddingHorizontal: 9,
-                  paddingVertical: 3,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
-              >
-                <Text style={{ color: colors.accent, fontSize: 11.5, fontWeight: '700' }}>
-                  {tickerContext}
-                </Text>
-                <Text style={{ color: colors.accent, fontSize: 12 }}>×</Text>
-              </Pressable>
-            ) : null}
-          </View>
-          <Text style={type.micro}>{streaming ? 'researching…' : 'research agent'}</Text>
-        </View>
+        <Text style={type.title}>FINN</Text>
+        {ticker ? (
+          <Pressable
+            onPress={() => setTicker(undefined)}
+            accessibilityRole="button"
+            accessibilityLabel={`Asking about ${ticker}. Tap to clear.`}
+            style={{ borderWidth: 1, borderColor: '#000000', paddingHorizontal: 8, minHeight: 32, justifyContent: 'center' }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>{ticker} ×</Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={reset}
+          accessibilityRole="button"
+          accessibilityLabel="Start a new conversation"
+          style={{ marginLeft: 'auto', minHeight: 40, justifyContent: 'center', paddingHorizontal: 6 }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600' }}>New</Text>
+        </Pressable>
       </View>
 
-      {/* messages */}
-      <RNScrollView
-        ref={scrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, gap: 12 }}
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-      >
-        {empty ? (
-          <View style={{ paddingTop: 10, gap: 12 }}>
-            <Text style={[type.small, { lineHeight: 19 }]}>
-              Ask about filings, results, guidance, or cash quality. FINN reads transcripts,
-              filings, and the fact sheet before answering.
+      <RNScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 14 }}>
+        {messages.length === 0 ? (
+          <View style={{ gap: 4 }}>
+            <Text style={[type.body, { color: colors.muted, marginBottom: 6 }]}>
+              Ask about any listed company. FINN answers only from its call transcripts, annual reports and results, and links every point to the page it came from.
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {(tickerContext
-                ? suggestions.map((s) => (s.includes('{ticker}') ? s.replace('{ticker}', tickerContext) : `${s} · ${tickerContext}`))
-                : suggestions
-              ).map((s) => (
-                <SuggestionChip key={s} label={s} onPress={() => send(s)} />
-              ))}
-            </View>
-            {filingId ? (
-              <Text style={type.micro}>
-                Context: filing #{filingId} · prefill your question below and press send.
-              </Text>
-            ) : null}
+            {(ticker
+              ? [`Did ${ticker} deliver what management promised?`, `What changed in ${ticker}'s latest results?`, `Bull and bear case for ${ticker} from its filings`]
+              : STARTERS
+            ).map((s) => (
+              <Pressable
+                key={s}
+                onPress={() => void send(s)}
+                accessibilityRole="button"
+                style={({ pressed }) => ({ minHeight: 48, justifyContent: 'center', borderTopWidth: 1, borderTopColor: colors.border, opacity: pressed ? 0.7 : 1 })}
+              >
+                <Text style={[type.body, { color: '#000000' }]}>{s} ›</Text>
+              </Pressable>
+            ))}
           </View>
         ) : (
-          messages.map((m) => <Bubble key={m.id} msg={m} ticker={tickerContext} />)
+          messages.map((m) => <Bubble key={m.id} msg={m} />)
         )}
-
-        {/* streaming status */}
-        {streaming ? (
-          <View style={{ gap: 8 }}>
-            {toolChips.length > 0 ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                {toolChips.map((t, i) => (
-                  <ToolChip key={`${t}-${i}`} label={t} active={i === toolChips.length - 1} />
-                ))}
-              </View>
-            ) : null}
-            {thinking.length > 0 && showThinking ? (
-              <Pressable onPress={() => setShowThinking(false)}>
-                <View
-                  style={{
-                    backgroundColor: colors.surface2,
-                    borderLeftWidth: 2,
-                    borderLeftColor: colors.borderStrong,
-                    paddingHorizontal: 10,
-                    paddingVertical: 8,
-                    borderRadius: radius.sm,
-                  }}
-                >
-                  {thinking.slice(-3).map((t, i) => (
-                    <Text
-                      key={i}
-                      style={{ color: colors.muted, fontStyle: 'italic', fontSize: 12, lineHeight: 17 }}
-                      numberOfLines={3}
-                    >
-                      {t.trim()}
-                    </Text>
-                  ))}
-                  <Text style={{ color: colors.faint, fontSize: 10.5, marginTop: 4 }}>
-                    tap to collapse
-                  </Text>
-                </View>
-              </Pressable>
-            ) : null}
+        {streaming && status ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} accessibilityLiveRegion="polite">
+            <Spinner size={12} color="#000000" />
+            <Text style={type.small}>{status}</Text>
           </View>
-        ) : null}
-
-        {error && !streaming ? (
-          <Text style={[type.micro, { color: colors.red }]}>{error}</Text>
         ) : null}
       </RNScrollView>
 
-      {/* composer */}
       <View
         style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: 8,
           paddingHorizontal: 12,
           paddingTop: 8,
-          paddingBottom: Math.max(insets.bottom, 12) + 2,
+          paddingBottom: 8,
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          backgroundColor: colors.bg,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder={tickerContext ? `Ask about ${tickerContext}…` : 'Ask FINN…'}
-            placeholderTextColor={colors.faint}
-            multiline
-            style={{
-              flex: 1,
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: radius.lg,
-              paddingHorizontal: 13,
-              paddingTop: 10,
-              paddingBottom: 10,
-              color: colors.text,
-              fontSize: 14.5,
-              maxHeight: 110,
-            }}
-          />
-          {streaming ? (
-            <Pressable
-              onPress={stop}
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.8 : 1,
-                width: 42,
-                height: 42,
-                borderRadius: 21,
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.borderStrong,
-                alignItems: 'center',
-                justifyContent: 'center',
-              })}
-            >
-              <StopIcon size={15} color={colors.text} />
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={() => void send(input)}
-              disabled={!input.trim()}
-              style={({ pressed }) => ({
-                opacity: !input.trim() ? 0.4 : pressed ? 0.85 : 1,
-                width: 42,
-                height: 42,
-                borderRadius: 21,
-                backgroundColor: colors.accent,
-                alignItems: 'center',
-                justifyContent: 'center',
-              })}
-            >
-              <SendIcon size={18} color="#04130C" />
-            </Pressable>
-          )}
-        </View>
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          placeholder={ticker ? `Ask about ${ticker}` : 'Ask about a company or your portfolio'}
+          placeholderTextColor={colors.muted}
+          multiline
+          accessibilityLabel="Question"
+          style={{
+            flex: 1,
+            minHeight: 44,
+            maxHeight: 120,
+            borderWidth: 1,
+            borderColor: 'rgba(0,0,0,0.25)',
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            fontSize: 15,
+            color: colors.text,
+          }}
+        />
+        <Pressable
+          onPress={streaming ? stop : () => void send(input)}
+          disabled={!streaming && !input.trim()}
+          accessibilityRole="button"
+          accessibilityLabel={streaming ? 'Stop' : 'Send'}
+          style={{
+            width: 48,
+            height: 48,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#000000',
+            opacity: !streaming && !input.trim() ? 0.35 : 1,
+          }}
+        >
+          {streaming ? <StopIcon size={15} color="#FFFFFF" /> : <SendIcon size={18} color="#FFFFFF" />}
+        </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-// --- Pieces -----------------------------------------------------------------------
-
-function SuggestionChip({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        opacity: pressed ? 0.75 : 1,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.borderStrong,
-        borderRadius: 999,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-      })}
-    >
-      <Text style={{ color: colors.text, fontSize: 12.5, fontWeight: '500' }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function ToolChip({ label, active }: { label: string; active: boolean }) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: active ? colors.accentDim : colors.border,
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-      }}
-    >
-      {active ? <Spinner size={11} /> : <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent }} />}
-      <Text style={{ color: colors.muted, fontSize: 11.5 }}>
-        {label.includes('search') ? `searching ${label.replace('search', 'transcripts').trim()}…` : `${label}…`}
-      </Text>
-    </View>
-  );
-}
-
-function Bubble({ msg, ticker }: { msg: Msg; ticker?: string }) {
+function Bubble({ msg }: { msg: Msg }) {
   if (msg.role === 'user') {
     return (
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-        <View
-          style={{
-            backgroundColor: colors.accent,
-            borderRadius: 16,
-            borderBottomRightRadius: 5,
-            paddingHorizontal: 13,
-            paddingVertical: 9,
-            maxWidth: '85%',
-          }}
-        >
-          <Text style={{ color: '#04130C', fontSize: 14.5, lineHeight: 20 }}>{msg.text}</Text>
-        </View>
+      <View style={{ alignSelf: 'flex-end', maxWidth: '85%', backgroundColor: '#000000', paddingHorizontal: 13, paddingVertical: 10 }}>
+        <Text style={{ color: '#FFFFFF', fontSize: 15, lineHeight: 21 }}>{msg.text}</Text>
       </View>
     );
   }
+  if (msg.pending) {
+    return <Text style={[type.small, { color: colors.muted }]}>Reading the documents…</Text>;
+  }
+  const cites = msg.citations ?? [];
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'flex-start' }}>
-      <View
-        style={{
-          backgroundColor: colors.surface,
-          borderRadius: 16,
-          borderBottomLeftRadius: 5,
-          borderWidth: 1,
-          borderColor: colors.border,
-          paddingHorizontal: 13,
-          paddingVertical: 10,
-          maxWidth: '88%',
-        }}
-      >
-        {msg.text ? (
-          <MarkdownLite text={msg.text} />
-        ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Spinner size={13} />
-            <Text style={{ color: colors.muted, fontSize: 13 }}>reading sources…</Text>
-          </View>
-        )}
-        {msg.citations && msg.citations.length > 0 ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-            {msg.citations.map((c, i) => (
-              <CitationChip label={c} key={i} />
-            ))}
-          </View>
-        ) : null}
-      </View>
+    <View style={{ gap: 10 }}>
+      <MarkdownLite text={msg.text} onCite={(n) => openSource(cites.find((c) => c.n === n)?.url)} />
+      {cites.length ? (
+        <View style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
+          {cites.map((c) => (
+            <Pressable
+              key={c.id}
+              onPress={() => openSource(c.url)}
+              disabled={!c.url}
+              accessibilityRole={c.url ? 'link' : 'text'}
+              accessibilityLabel={`Source ${c.n}: ${c.title}`}
+              style={({ pressed }) => ({ flexDirection: 'row', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border, opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text style={{ width: 18, fontSize: 12, fontWeight: '700' }}>{c.n}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[type.small, { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>
+                  {DOC_LABEL[c.doc_type] ?? 'Document'} · {c.period || c.title}
+                </Text>
+                {c.excerpt ? (
+                  <Text style={type.micro} numberOfLines={2}>"{c.excerpt.replace(/\s+/g, ' ').trim()}"</Text>
+                ) : c.provider ? (
+                  <Text style={type.micro}>{c.provider === 'screener_live' ? 'Screener quarterly table, compiled from exchange filings' : c.provider}</Text>
+                ) : null}
+              </View>
+              {c.url ? <Text style={[type.micro, { color: '#000000' }]}>Open</Text> : null}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {msg.receipt ? (
+        <Text style={[type.micro, { color: colors.muted }]}>
+          {msg.receipt.tier === 'cache'
+            ? 'Saved answer, documents unchanged · 0 tokens'
+            : `${msg.receipt.lane === 'research' ? 'Reasoning model' : 'Fast model'} · ${fmtK(msg.receipt.prompt_tokens + msg.receipt.completion_tokens)} tokens`}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-function CitationChip({ label }: { label: string }) {
-  return (
-    <View
-      style={{
-        backgroundColor: 'rgba(16,185,129,0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(16,185,129,0.25)',
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        maxWidth: '100%',
-      }}
-    >
-      <Text style={{ color: colors.accent, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-/** Split the SOURCES section out of a final answer. */
-function extractCitations(text: string): string[] {
-  const idx = text.search(/^SOURCES:?\s*$/im);
-  if (idx === -1) return [];
-  const head = text.slice(0, idx).trim();
-  void head;
-  const tail = text.slice(idx).replace(/^SOURCES:?\s*$/im, '');
-  return tail
-    .split('\n')
-    .map((l) => l.replace(/^[\s\-•*\d.)]+/, '').trim())
-    .filter((l) => l.length > 2)
-    .slice(0, 8);
+function fmtK(n: number) {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
