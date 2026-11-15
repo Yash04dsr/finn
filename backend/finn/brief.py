@@ -9,7 +9,7 @@ import json
 import re
 from datetime import datetime, timezone
 
-from . import db
+from . import db, state
 from .alerts import engine
 
 VERDICTS = {"no_impact", "watch", "changes_story"}
@@ -49,13 +49,19 @@ def add_watchpoint(ticker: str, text: str, kind: str = "", lo=None, hi=None,
         cur = c.execute(
             "INSERT INTO watchpoints(ticker, text, kind, lo, hi, source_chunk, origin) VALUES(?,?,?,?,?,?,?)",
             (ticker, text.strip()[:160], kind, lo, hi, source_chunk, origin))
-        row = c.execute("SELECT * FROM watchpoints WHERE id=?", (cur.lastrowid,)).fetchone()
-    return dict(row)
+        row = dict(c.execute("SELECT * FROM watchpoints WHERE id=?", (cur.lastrowid,)).fetchone())
+    # Drafted watchpoints are rebuilt from the ledger on any instance; the investor's own are kept.
+    if origin == "investor":
+        state.record_watchpoint(row)
+    return row
 
 
 def delete_watchpoint(ticker: str, wp_id: int) -> None:
     with db.db() as c:
+        row = c.execute("SELECT text FROM watchpoints WHERE ticker=? AND id=?", (ticker, wp_id)).fetchone()
         c.execute("DELETE FROM watchpoints WHERE ticker=? AND id=?", (ticker, wp_id))
+    if row:
+        state.record_watchpoint_deleted(ticker, row["text"])
 
 
 def draft_from_ledger(ticker: str, ledger: dict) -> list[dict]:
@@ -64,15 +70,17 @@ def draft_from_ledger(ticker: str, ledger: dict) -> list[dict]:
         return watchpoints(ticker)
     drafted, seen = [], set()
     rows = sorted(ledger.get("rows", []), key=lambda r: [-x for x in _pk(r["period"])])
-    from .tools.ledger import long_horizon
+    removed = state.deleted_watchpoints(ticker)
     for r in rows:
         lo, hi = _row_bounds(r)
         if (r["kind"] not in LABELS or r["kind"] in seen or lo is None or not r.get("company_level", True)
-                or long_horizon(r.get("horizon"))):
+                or r.get("term") == "long"):
+            continue
+        text = f"{LABELS[r['kind']]} {r['band']}, as guided on the {r['period']} call"
+        if text.lower() in removed:
             continue
         seen.add(r["kind"])
         src = r.get("promise_source") or {}
-        text = f"{LABELS[r['kind']]} {r['band']}, as guided on the {r['period']} call"
         chunk = int(src["source_id"][1:]) if src.get("source_id") else None
         drafted.append(add_watchpoint(ticker, text, r["kind"], lo, hi, chunk, "drafted"))
         if len(drafted) >= 4:
@@ -109,7 +117,8 @@ def prune_ungradable_watchpoints() -> int:
         for w in c.execute("SELECT id, kind, source_chunk FROM watchpoints WHERE origin='drafted'"
                            " AND source_chunk IS NOT NULL").fetchall():
             claims = [dict(r) for r in c.execute(
-                "SELECT metric, quote, horizon FROM guidance_claims WHERE chunk_id=? AND kind=? AND version=?",
+                "SELECT metric, quote, horizon, period, chunk_id FROM guidance_claims"
+                " WHERE chunk_id=? AND kind=? AND version=?",
                 (w["source_chunk"], w["kind"], EXTRACT_VERSION))]
             if claims and not any(checkable_now(cl) for cl in claims):
                 c.execute("DELETE FROM watchpoints WHERE id=?", (w["id"],))
@@ -223,12 +232,18 @@ def _numbers_source(facts: dict) -> str:
 
 def _guidance(ticker: str, kind: str, before: str | None, points: list[dict]) -> dict | None:
     """The newest numeric band for this metric guided on a call before the reported quarter."""
-    from .tools.ledger import EXTRACT_VERSION, checkable_now
+    from .tools.ledger import EXTRACT_VERSION, checkable_now, promise_term
     with db.db() as c:
         claims = [dict(r) for r in c.execute(
-            "SELECT period, lo, hi, chunk_id, quote, metric, horizon FROM guidance_claims WHERE ticker=? AND kind=?"
+            "SELECT period, lo, hi, chunk_id, quote, metric, horizon, unit FROM guidance_claims WHERE ticker=? AND kind=?"
             " AND unit='%' AND lo IS NOT NULL AND version=?", (ticker, kind, EXTRACT_VERSION))]
-    whole = [r for r in claims if checkable_now(r)]
+    reported_fy = _pk(before)[0] if before else None
+
+    def due(r: dict) -> bool:
+        target = promise_term(r)[1]
+        return target is None or reported_fy is None or reported_fy >= target
+
+    whole = [r for r in claims if checkable_now(r) and due(r)]
     segment_only = {r["chunk_id"] for r in claims} - {r["chunk_id"] for r in whole}
     found = []
     for w in points:
@@ -304,6 +319,8 @@ def set_verdict(alert_id: int, verdict: str, note: str = "", mute_category: bool
         c.execute("INSERT OR REPLACE INTO verdicts(alert_id, ticker, verdict, note) VALUES(?,?,?,?)",
                   (alert_id, alert["ticker"], verdict, note[:300]))
         c.execute("UPDATE alerts SET read=1 WHERE id=?", (alert_id,))
+        created = c.execute("SELECT created_at FROM verdicts WHERE alert_id=?", (alert_id,)).fetchone()[0]
+    state.record_verdict(alert, verdict, note[:300], created)
     muted = None
     category = (alert["payload"] or {}).get("category")
     if mute_category and category:

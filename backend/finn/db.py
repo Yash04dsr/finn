@@ -667,8 +667,11 @@ def get_setting(key: str, default: str | None = None) -> str | None:
 
 
 def set_setting(key: str, value: str) -> None:
+    from . import state
+
     with db() as c:
         c.execute("INSERT OR REPLACE INTO settings(key, value) VALUES(?,?)", (key, value))
+    state.record_setting(key, value)
 
 
 def get_json_setting(key: str, default: dict | None = None) -> dict:

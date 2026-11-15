@@ -20,7 +20,7 @@ from ..llm import routing
 
 log = logging.getLogger("finn.ledger")
 
-EXTRACT_VERSION = "v4"
+EXTRACT_VERSION = "v5"
 # Statements an investor tracks; others (tax rate, amortisation, loan pricing) stay out of the ledger.
 _TRACKED = re.compile(r"revenue|sales|growth|ebitda|ebit|margin|profit|cost|capex|debt|leverage|"
                       r"volume|production|capacity|order|deal|dividend|cash|guidance", re.I)
@@ -42,18 +42,93 @@ def company_level(metric: str | None, quote: str | None) -> bool:
     return not _SEGMENT.search(f"{metric or ''} {quote or ''}")
 
 
-# A target years out is not tested by one quarter's numbers.
-_LONG_HORIZON = re.compile(r"long[- ]term|medium[- ]term|multi[- ]?year|over (?:a period of )?time|"
-                           r"\b\d+\s*(?:to|-)?\s*\d*\s*years\b", re.I)
+# When a promise falls due is read from management's own words, not the model's summary of
+# them, so the same quote grades the same way on every build. A target years out is not
+# tested by one quarter's numbers; a standing band with no date is tested every quarter.
+_LONG_TERM = re.compile(
+    r"\b(?:long|medium|mid)[- ]?term\b|\bmulti[- ]?year|\bover (?:a )?(?:period of )?time\b|\bover the years\b|"
+    r"\b(?:next|coming|few|couple of|several|two|three|four|five)\s+(?:\w+\s+)?years\b|"
+    r"\b\d+\s*(?:to|-)?\s*\d*\s*years\b|\bin due course\b|\beventually\b", re.I)
+_NEAR_TERM = re.compile(
+    r"\b(?:this|next|current|coming|full|same)\s+(?:financial\s+|fiscal\s+)?(?:year|quarters?|fiscal)\b|"
+    r"\bq[1-4]\b|\byear[- ]end\b|\bexit\w*\b|\bby (?:the )?end of the year\b", re.I)
+_TARGET_FY = re.compile(r"\bfy\s?(20\d{2}|\d{2})\b|\bmarch\s+(20\d{2})\b|\bby\s+(20\d{2})\b", re.I)
+_EBIT = re.compile(r"\bebit\b|\boperating (?:profit )?margins?\b", re.I)
+_EBITDA = re.compile(r"\bebitda\b", re.I)
 
 
-def long_horizon(horizon: str | None) -> bool:
-    return bool(_LONG_HORIZON.search(horizon or ""))
+def _call_fy(period: str | None) -> int | None:
+    m = re.fullmatch(r"Q[1-4]FY(\d{2})", period or "")
+    return int(m.group(1)) if m else None
+
+
+def _passage(chunk_id) -> str:
+    if not chunk_id:
+        return ""
+    with db.db() as c:
+        row = c.execute("SELECT text FROM chunks WHERE id=?", (chunk_id,)).fetchone()
+    return row["text"] if row else ""
+
+
+def quote_context(quote: str, passage: str) -> str:
+    """The whole sentence(s) of the passage that the quote was taken from."""
+    q, text = _norm(quote or ""), _norm(passage or "")
+    words = q.split()
+    if len(words) < 4 or not text:
+        return q
+    start = text.find(" ".join(words[:6]))
+    if start < 0:
+        return q
+    tail = " ".join(words[-4:])
+    end = text.find(tail, start)
+    end = end + len(tail) if end >= 0 else start + len(q)
+    left = text.rfind(". ", 0, start)
+    right = text.find(". ", end)
+    return text[left + 2 if left >= 0 else 0: right if right >= 0 else len(text)]
+
+
+def _term_of(text: str, call_fy: int | None) -> tuple[str | None, int | None]:
+    years = []
+    for m in _TARGET_FY.finditer(text):
+        raw = next(g for g in m.groups() if g)
+        years.append(int(raw[-2:]))
+    if years and call_fy is not None:
+        target = max(years)
+        return ("long" if target > call_fy + 1 else "near"), target
+    if _LONG_TERM.search(text):
+        return "long", None
+    if _NEAR_TERM.search(text):
+        return "near", None
+    return None, None
+
+
+def promise_term(claim: dict, passage: str | None = None) -> tuple[str, int | None]:
+    """('near' or 'long', target fiscal year if one is named), from the quote then its sentence."""
+    call_fy = _call_fy(claim.get("period"))
+    quote = _norm(claim.get("quote") or "")
+    term, target = _term_of(quote, call_fy)
+    if term is None:
+        if passage is None:
+            passage = _passage(claim.get("chunk_id"))
+        term, target = _term_of(quote_context(claim.get("quote") or "", passage), call_fy)
+    return term or "near", target
+
+
+def margin_kind(kind: str, quote: str, passage: str = "") -> str:
+    """EBIT or EBITDA margin by the words management used; a margin they leave unnamed is EBITDA."""
+    if kind not in ("ebit_margin", "ebitda_margin"):
+        return kind
+    for text in (quote, quote_context(quote, passage)):
+        if _EBITDA.search(text):
+            return "ebitda_margin"
+        if _EBIT.search(text):
+            return "ebit_margin"
+    return "ebitda_margin"
 
 
 def checkable_now(claim: dict) -> bool:
     """A company-wide promise that the latest quarter can fairly be held to."""
-    return company_level(claim.get("metric"), claim.get("quote")) and not long_horizon(claim.get("horizon"))
+    return company_level(claim.get("metric"), claim.get("quote")) and promise_term(claim)[0] == "near"
 
 EXTRACT_PROMPT = """You read passages from one company's earnings call and list management's explicit forward-looking commitments that contain a number.
 
@@ -100,6 +175,15 @@ async def extract_claims(ticker: str, doc: dict) -> int:
             return 0
         chunks = [dict(r) for r in c.execute(
             "SELECT id, text FROM chunks WHERE ticker=? AND url=? ORDER BY seq", (ticker, doc["url"]))]
+    from .. import state
+
+    if state.enabled():
+        # Another build or instance may already have read this call: reuse its claims.
+        await asyncio.to_thread(state.restore_company, ticker)
+        with db.db() as c:
+            if c.execute("SELECT 1 FROM guidance_claims WHERE doc_url=? AND version=? LIMIT 1",
+                         (doc["url"], EXTRACT_VERSION)).fetchone():
+                return 0
     candidates = [ch for ch in chunks if _GUIDE.search(ch["text"]) and re.search(r"\d", ch["text"])]
     candidates.sort(key=lambda ch: -len(_GUIDE.findall(ch["text"])))
     candidates = candidates[:10]
@@ -117,6 +201,7 @@ async def extract_claims(ticker: str, doc: dict) -> int:
             log.warning("guidance extraction failed for %s %s: %s", ticker, doc["period"], exc)
             return 0
     by_id = {ch["id"]: _norm(ch["text"]) for ch in candidates}
+    raw_text = {ch["id"]: ch["text"] for ch in candidates}
     kept = 0
     with db.db() as c:
         for cl in claims:
@@ -133,6 +218,7 @@ async def extract_claims(ticker: str, doc: dict) -> int:
             if "?" in quote or re.match(r"(would|could|can|do|does|did|will|is|are|should) you\b", quote, re.I):
                 continue
             kind = cl.get("kind") if cl.get("kind") in GRADABLE | {"other"} else "other"
+            kind = margin_kind(kind, quote, raw_text[chunk_id])
             lo, hi = _num(cl.get("lo")), _num(cl.get("hi"))
             hi = lo if hi is None else hi
             lo = hi if lo is None else lo
@@ -149,6 +235,7 @@ async def extract_claims(ticker: str, doc: dict) -> int:
             # Remember that this transcript was read, so it is not sent to the model again.
             c.execute("INSERT INTO guidance_claims(ticker, doc_url, period, kind, metric, quote, version)"
                       " VALUES(?,?,?,?,?,?,?)", (ticker, doc["url"], doc["period"], "none", "", "", EXTRACT_VERSION))
+    await asyncio.to_thread(state.record_claims, ticker, doc["url"], EXTRACT_VERSION)
     return kept
 
 
@@ -204,12 +291,18 @@ def grade(claims: list[dict], series: list[dict], transcript_periods: list[str])
                         and o["unit"] == cl["unit"] and company_level(o.get("metric"), o.get("quote"))
                         and period_key(o["period"]) > period_key(cl["period"])]
         later_calls = [p for p in transcript_periods if period_key(p) > period_key(cl["period"])]
+        term, target_fy = promise_term(cl)
+        if target_fy is not None:
+            # A band for a named year is tested by that year's quarters, not the ones before it.
+            later_quarters = [p for p in later_quarters if period_key(p)[0] >= target_fy]
         status, delivered, delivered_period, note = "not_checkable", None, None, ""
         if cl["kind"] in GRADABLE and not whole:
             note = "Guidance for one part of the business; reported numbers are company-wide"
-        elif cl["kind"] in GRADABLE and long_horizon(cl.get("horizon")):
+        elif cl["kind"] in GRADABLE and term == "long":
             status, note = "too_early", "A longer-term target; one quarter does not test it"
         elif cl["kind"] in GRADABLE and cl["unit"] in ("%",) and cl["lo"] is not None:
+            if target_fy is not None and not later_quarters:
+                note = f"Guided for FY{target_fy}; no FY{target_fy} quarter reported yet"
             if later_quarters:
                 delivered_period = later_quarters[-1]
                 delivered = _delivered(cl["kind"], series, delivered_period)
@@ -230,7 +323,7 @@ def grade(claims: list[dict], series: list[dict], transcript_periods: list[str])
         rows.append({
             "period": cl["period"], "kind": cl["kind"], "metric": cl["metric"],
             "band": _band(cl), "lo": cl.get("lo"), "hi": cl.get("hi"), "unit": cl.get("unit"),
-            "horizon": cl["horizon"], "quote": cl["quote"], "speaker": cl["speaker"],
+            "horizon": cl["horizon"], "term": term, "quote": cl["quote"], "speaker": cl["speaker"],
             "status": status, "delivered": delivered, "delivered_period": delivered_period, "note": note,
             "company_level": whole,
             "promise_source": _source(cl["chunk_id"]),

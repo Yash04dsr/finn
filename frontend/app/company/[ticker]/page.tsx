@@ -70,23 +70,28 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
     };
   }, [ticker, loadLedger, attempt]);
 
-  // While FINN fetches and reads newer transcripts, check back and grade once they land.
+  // While FINN fetches and reads newer transcripts, keep a request open so the backend keeps
+  // working (a serverless instance pauses between requests), then grade once they land.
   const preparing = company?.preparing?.state === "running";
   useEffect(() => {
     if (!preparing) return;
-    const t = window.setInterval(async () => {
-      try {
-        const c = await api.coverage(ticker);
-        setCompany((d) => (d ? { ...d, coverage: c.coverage, preparing: c.preparing } : d));
-        if (c.preparing?.state !== "running") {
-          window.clearInterval(t);
-          void loadLedger();
+    const ctrl = new AbortController();
+    void (async () => {
+      for (let attempt = 0; attempt < 20 && !ctrl.signal.aborted; attempt++) {
+        try {
+          const c = await api.coverage(ticker, ctrl.signal, true);
+          setCompany((d) => (d ? { ...d, coverage: c.coverage, preparing: c.preparing } : d));
+          if (c.preparing?.state !== "running") {
+            void loadLedger();
+            return;
+          }
+        } catch {
+          if (ctrl.signal.aborted) return;
         }
-      } catch {
-        /* keep polling quietly */
+        await new Promise((r) => window.setTimeout(r, 1000));
       }
-    }, 3000);
-    return () => window.clearInterval(t);
+    })();
+    return () => ctrl.abort();
   }, [preparing, ticker, loadLedger]);
 
   const toggleWatch = async () => {

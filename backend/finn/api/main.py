@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -23,7 +24,7 @@ from google.adk import Runner
 from google.adk.sessions import DatabaseSessionService
 from google.genai import types
 
-from .. import db
+from .. import db, state
 from ..agent import build_finn_agent
 from ..alerts import engine
 from ..alerts.push import get_public_key
@@ -38,7 +39,7 @@ from ..config import (
 from ..ingest import prices as prices_ingest
 from ..llm import routing
 from ..llm.chat_guard import out_of_scope_reply, plain_voice
-from ..pipeline import run_pipeline
+from ..pipeline import reanchor_sample, run_pipeline
 from ..scheduler import start_scheduler, stop_scheduler
 from ..tools import portfolio as portfolio_tools
 
@@ -70,22 +71,28 @@ async def lifespan(_app: FastAPI):
     if db.chunk_count() == 0:
         from ..ingest.seed_docs import seed_all
         seed_all()
-    scheduler_enabled = os.getenv("VERCEL") != "1"
-    if scheduler_enabled:
+    serverless = os.getenv("VERCEL") == "1"
+    # The investor's settings decide which companies the sample day covers, so load them first.
+    await asyncio.to_thread(state.sync, True)
+    if not serverless:
         start_scheduler()
     if os.getenv("FINN_SAMPLE_ON_START") == "1" and os.getenv("FINN_TEST_DB") != "1":
-        # Serverless instances start from the bundled DB; re-anchor its sample day (about 1s,
-        # no model calls) so a fresh instance never serves an empty or stale brief.
+        # Serverless instances start from the bundled DB; move its sample day to now so a
+        # fresh instance never serves an empty or stale brief.
         try:
-            await run_pipeline(sample=True, push=False)
+            if reanchor_sample() < 0:
+                await run_pipeline(sample=True, push=False)
         except Exception:
             log.exception("sample day re-anchor failed")
-    if os.getenv("FINN_TEST_DB") != "1" and os.getenv("FINN_WARM_LEDGER", "1") == "1":
+    # Ledgers are graded at build time on serverless; elsewhere confirm them in the background.
+    if os.getenv("FINN_TEST_DB") != "1" and os.getenv("FINN_WARM_LEDGER", "0" if serverless else "1") == "1":
         asyncio.get_running_loop().create_task(_warm_sample_ledgers())
+    if os.getenv("FINN_TEST_DB") != "1":
+        _start_warm()
     try:
         yield
     finally:
-        if scheduler_enabled:
+        if not serverless:
             stop_scheduler()
 
 
@@ -149,6 +156,14 @@ async def public_demo_limits(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def durable_state(request: Request, call_next):
+    """Pick up what other instances saved (at most one store check every few seconds)."""
+    if request.url.path.startswith("/api/") and state.enabled():
+        await asyncio.to_thread(state.sync)
+    return await call_next(request)
+
+
 _research_runner: Runner | None = None
 _session_service: DatabaseSessionService | None = None
 _last_ticker: dict[str, str] = {}
@@ -171,30 +186,61 @@ def _sessions() -> DatabaseSessionService:
     return _session_service
 
 
+_runner_lock = threading.Lock()
+
+
 def get_runner() -> Runner:
     """Fast-tier assistant for portfolio-wide questions."""
     global _runner
-    if _runner is None:
-        routing.ensure_llm_env()
-        _runner = Runner(app_name="finn", agent=build_finn_agent(),
-                         session_service=_sessions(), auto_create_session=True)
+    with _runner_lock:
+        if _runner is None:
+            routing.ensure_llm_env()
+            _runner = Runner(app_name="finn", agent=build_finn_agent(),
+                             session_service=_sessions(), auto_create_session=True)
     return _runner
 
 
 def get_research_runner() -> Runner:
     """Reasoning-tier analyst for company questions, grounded in primary documents."""
     global _research_runner
-    if _research_runner is None:
-        from ..agents.research_analyst import build_research_analyst
+    with _runner_lock:
+        if _research_runner is None:
+            from ..agents.research_analyst import build_research_analyst
 
-        routing.ensure_llm_env()
-        _research_runner = Runner(app_name="finn_research", agent=build_research_analyst(),
-                                  session_service=_sessions(), auto_create_session=True)
+            routing.ensure_llm_env()
+            import litellm  # noqa: F401  (loaded here so the first model call does not pay for it)
+
+            _research_runner = Runner(app_name="finn_research", agent=build_research_analyst(),
+                                      session_service=_sessions(), auto_create_session=True)
     return _research_runner
 
 
+_warm_task: asyncio.Task | None = None
+
+
+async def _warm() -> None:
+    """Build the chat agents and their session tables before the first question needs them."""
+    started = time.monotonic()
+    await asyncio.to_thread(lambda: (get_research_runner(), get_runner()))
+    await _sessions().get_session(app_name="finn_research", user_id="warmup", session_id="warmup")
+    log.info("chat warm in %.1fs", time.monotonic() - started)
+
+
+def _start_warm() -> asyncio.Task:
+    global _warm_task
+    if _warm_task is None or (_warm_task.done() and _warm_task.exception() is not None):
+        _warm_task = asyncio.get_running_loop().create_task(_warm())
+    return _warm_task
+
+
 @app.get("/healthz")
-async def healthz():
+@app.get("/api/healthz")
+async def healthz(warm: bool = False):
+    """`warm=1` holds the request until chat is ready, so a serverless instance is not
+    frozen halfway through warming up."""
+    task = _start_warm() if os.getenv("FINN_TEST_DB") != "1" else None
+    if warm and task is not None:
+        await asyncio.wait({task}, timeout=25)
     primary_chunks = sum(
         db.chunk_count(doc_type=kind)
         for kind in ("transcript", "annual_report", "results_filing")
@@ -202,6 +248,8 @@ async def healthz():
     return {
         "ok": True,
         "database": "ready",
+        "durable_state": state.enabled(),
+        "chat_warm": bool(task and task.done() and task.exception() is None),
         "research_chunks": primary_chunks,
         "research_ready": primary_chunks > 0,
     }
@@ -324,7 +372,6 @@ async def api_chat(body: dict):
 
             return StreamingResponse(cached_stream(), media_type="text/event-stream",
                                      headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-    runner = get_research_runner() if lane == "research" else get_runner()
     app_name = "finn_research" if lane == "research" else "finn"
     tier = routing.Tier.REASONING if lane == "research" else routing.Tier.FAST
     # Isolate ADK history per client session.
@@ -333,20 +380,25 @@ async def api_chat(body: dict):
     async def event_stream():
         try:
             yield sse({"type": "route", "lane": lane, "ticker": routed_ticker})
+            yield sse({"type": "tool", "tool_name": "Reading your question", "done": False})
+            if lane == "research":
+                await asyncio.to_thread(state.restore_company, routed_ticker)
             if lane == "research" and routed_ticker not in _hydrated and db.chunk_count(routed_ticker):
-                await _hydrate_company(routed_ticker, prices=False)
+                # Stored numbers are enough to start; refresh them while the analyst reads.
                 _hydrated.add(routed_ticker)
+                if db.quarterly_series(routed_ticker, limit=1):
+                    asyncio.get_running_loop().create_task(_hydrate_company(routed_ticker, prices=False))
+                else:
+                    await _hydrate_company(routed_ticker, prices=False)
             if lane == "research" and db.chunk_count(routed_ticker) == 0:
-                from ..ingest.discovery import ensure_research_docs
-
-                yield sse({"type": "tool", "tool_name": f"Fetching {routed_ticker}'s latest call transcript",
+                yield sse({"type": "tool", "tool_name": f"Fetching {routed_ticker}'s recent call transcripts",
                            "done": False})
                 if routed_ticker not in _hydrated:
                     await _hydrate_company(routed_ticker)
                     _hydrated.add(routed_ticker)
-                await asyncio.to_thread(ensure_research_docs, routed_ticker, 1, 40.0)
-                if db.chunk_count(routed_ticker):
-                    _start_prepare(routed_ticker)
+                async for step in _prepare_steps(routed_ticker, limit_s=150):
+                    yield sse({"type": "tool", "tool_name": step, "done": False})
+            runner = await asyncio.to_thread(get_research_runner if lane == "research" else get_runner)
             session = await runner.session_service.get_session(
                 app_name=app_name, user_id=user_id, session_id=session_id)
             if session is None:
@@ -481,6 +533,7 @@ async def api_company(ticker: str):
     from ..tools import guidance as guidance_mod
     from ..tools import portfolio as pf  # noqa: F401 (median peers)
 
+    await asyncio.to_thread(state.restore_company, ticker)
     snap = prices_ingest.price_snapshot(ticker)
     quarterly = db.quarterly_series(ticker, limit=8)
     if ticker not in _hydrated:
@@ -538,13 +591,22 @@ async def api_company(ticker: str):
 
 _hydrated: set[str] = set()
 _prepare_state: dict[str, dict] = {}
+_prepare_tasks: dict[str, asyncio.Task] = {}
+PREPARE_BUDGET_S = 120.0
 
 
-def _start_prepare(ticker: str) -> None:
-    """Fetch and index the company's newest transcripts in the background, once."""
-    state = _prepare_state.get(ticker)
-    if state and state["state"] in ("running", "done"):
-        return
+def _start_prepare(ticker: str) -> asyncio.Task | None:
+    """Fetch and index the company's newest transcripts, once per instance.
+
+    Serverless hosts pause an instance between requests, so work is not left to run on its
+    own: the chat stream and the company page's coverage polls wait on this task, and each
+    poll keeps it moving. Documents land in the durable store as each one is read.
+    """
+    task = _prepare_tasks.get(ticker)
+    if task and not task.done():
+        return task
+    if (_prepare_state.get(ticker) or {}).get("state") == "done":
+        return None
     _prepare_state[ticker] = {"state": "running", "message": "Finding the latest call transcripts"}
 
     def progress(message: str) -> None:
@@ -554,18 +616,35 @@ def _start_prepare(ticker: str) -> None:
         from ..ingest.discovery import ensure_research_docs
 
         try:
-            result = await asyncio.to_thread(ensure_research_docs, ticker, 4, 120.0, False, progress)
-            ready = any(d["status"] == "ready" for d in result.get("documents", []))
+            result = await asyncio.to_thread(ensure_research_docs, ticker, 4, PREPARE_BUDGET_S, False, progress)
+            docs = result.get("documents", [])
+            ready = any(d["status"] == "ready" for d in docs)
             _prepare_state[ticker] = {
                 "state": "done" if ready else "failed",
                 "message": "Ready" if ready else "No readable transcripts were found for this company",
-                "documents": result.get("documents", []),
+                "documents": docs,
             }
         except Exception:
             log.exception("prepare failed for %s", ticker)
             _prepare_state[ticker] = {"state": "failed", "message": "Could not fetch documents right now"}
 
-    asyncio.get_running_loop().create_task(run())
+    task = asyncio.get_running_loop().create_task(run())
+    _prepare_tasks[ticker] = task
+    return task
+
+
+async def _prepare_steps(ticker: str, limit_s: float):
+    """Run the company's document fetch inside this request, yielding each progress step."""
+    task = _start_prepare(ticker)
+    if task is None:
+        return
+    shown, deadline = None, time.monotonic() + limit_s
+    while not task.done() and time.monotonic() < deadline:
+        message = (_prepare_state.get(ticker) or {}).get("message")
+        if message and message != shown:
+            shown = message
+            yield message
+        await asyncio.wait({task}, timeout=0.5)
 
 
 @app.get("/api/company/{ticker}/ledger")
@@ -575,6 +654,7 @@ async def api_company_ledger(ticker: str):
     from ..tools.ledger import build_ledger
 
     ticker = _normalize_ticker(ticker)
+    await asyncio.to_thread(state.restore_company, ticker)
     if ticker not in _hydrated and os.getenv("FINN_TEST_DB") != "1":
         await _hydrate_company(ticker, prices=False)
         _hydrated.add(ticker)
@@ -659,10 +739,17 @@ async def api_verdicts():
 
 
 @app.get("/api/company/{ticker}/coverage")
-async def api_company_coverage(ticker: str):
+async def api_company_coverage(ticker: str, prepare: bool = False):
+    """With `prepare=1`, start or continue the document fetch and wait on it for a while,
+    so a client polling this endpoint is what carries the work to completion."""
     from ..ingest.discovery import coverage as coverage_of
 
     ticker = _normalize_ticker(ticker)
+    await asyncio.to_thread(state.restore_company, ticker)
+    if prepare and os.getenv("FINN_TEST_DB") != "1":
+        task = _start_prepare(ticker)
+        if task is not None:
+            await asyncio.wait({task}, timeout=20)
     return {"ticker": ticker, "coverage": coverage_of(ticker), "preparing": _prepare_state.get(ticker)}
 
 

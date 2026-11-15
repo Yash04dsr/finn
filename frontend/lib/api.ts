@@ -100,8 +100,12 @@ export const api = {
   ledger: (ticker: string, signal?: AbortSignal) =>
     jsonFetch<Ledger>(`/api/company/${encodeURIComponent(ticker)}/ledger`, { signal }),
 
-  coverage: (ticker: string, signal?: AbortSignal) =>
-    jsonFetch<CoverageResponse>(`/api/company/${encodeURIComponent(ticker)}/coverage`, { signal }),
+  /** `prepare` asks the backend to carry on fetching documents while this request is open. */
+  coverage: (ticker: string, signal?: AbortSignal, prepare = false) =>
+    jsonFetch<CoverageResponse>(
+      `/api/company/${encodeURIComponent(ticker)}/coverage${prepare ? "?prepare=1" : ""}`,
+      { signal }
+    ),
 
   resolve: (query: string, signal?: AbortSignal) =>
     jsonFetch<{ ticker: string; name: string | null }>(`/api/resolve?q=${encodeURIComponent(query)}`, { signal }),

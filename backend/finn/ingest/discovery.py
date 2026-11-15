@@ -8,15 +8,18 @@ ticker FINN has never seen before.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeout
 from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
 
-from .. import db
+from .. import db, state
 from ..config import PDF_DIR
 
 log = logging.getLogger("finn.discovery")
@@ -104,24 +107,40 @@ def _ingested_urls(ticker: str) -> set[str]:
         return {r[0] for r in c.execute("SELECT DISTINCT url FROM chunks WHERE ticker=?", (ticker,))}
 
 
-def _fetch_and_index(ticker: str, doc_type: str, title: str, period: str, url: str) -> int:
-    from .docs import download_pdf, ingest_pdf
-
+def _local_pdf(ticker: str, doc_type: str, period: str, url: str) -> Path:
     safe = re.sub(r"[^A-Za-z0-9]", "", period or doc_type)
-    local = PDF_DIR / f"{ticker}_{doc_type}_{safe}_{abs(hash(url)) % 10**8}.pdf"
-    if not (local.exists() and local.stat().st_size > 10_000) and not download_pdf(url, local):
-        return 0
-    return ingest_pdf(ticker, doc_type, title, period, url, local)
+    digest = hashlib.sha256(url.encode()).hexdigest()[:10]
+    return PDF_DIR / f"{ticker}_{doc_type}_{safe}_{digest}.pdf"
+
+
+def _download(ticker: str, doc_type: str, period: str, url: str, timeout_s: float) -> Path | None:
+    from .docs import download_pdf
+
+    local = _local_pdf(ticker, doc_type, period, url)
+    if local_path_ok(local) or download_pdf(url, local, timeout=timeout_s):
+        return local
+    return None
+
+
+def _index(ticker: str, doc_type: str, title: str, period: str, url: str, local: Path) -> int:
+    from .docs import ingest_pdf
+
+    chunks = ingest_pdf(ticker, doc_type, title, period, url, local)
+    if chunks:
+        state.record_document(ticker, url)
+    return chunks
 
 
 def ensure_research_docs(ticker: str, transcripts: int = 2, budget_s: float = 45.0,
                          include_annual_report: bool = False, progress=None) -> dict:
     """Index the newest call transcripts (and optionally the latest annual report).
 
-    Already-indexed documents are skipped. Stops starting new downloads once the
-    time budget is spent; whatever finished stays available.
+    Documents already indexed here, or read by another instance, are skipped. The rest
+    download in parallel, each bounded by what is left of the time budget, and are read
+    as they arrive; anything still missing when the budget runs out is reported as queued.
     """
     started = time.time()
+    state.restore_company(ticker)
     html = company_page(ticker)
     if not html:
         return {"ticker": ticker, "status": "not_found", "documents": []}
@@ -141,24 +160,39 @@ def ensure_research_docs(ticker: str, transcripts: int = 2, budget_s: float = 45
         plan.append(("annual_report", f"{ticker} Annual Report {report['year']}",
                      f"FY{str(report['year'])[-2:]}", report["url"]))
 
-    documents = []
-    for doc_type, title, period, url in plan:
-        if url in have:
-            documents.append({"doc_type": doc_type, "title": title, "period": period,
-                              "url": url, "status": "ready"})
-            continue
-        if time.time() - started > budget_s:
-            documents.append({"doc_type": doc_type, "title": title, "period": period,
-                              "url": url, "status": "queued"})
-            continue
+    documents = {url: {"doc_type": doc_type, "title": title, "period": period, "url": url,
+                       "status": "ready" if url in have else "queued"}
+                 for doc_type, title, period, url in plan}
+    todo = [p for p in plan if p[3] not in have]
+    remaining = budget_s - (time.time() - started)
+    if todo and remaining > 1:
         if progress:
-            progress(f"Reading {title}")
-        chunks = _fetch_and_index(ticker, doc_type, title, period, url)
-        documents.append({"doc_type": doc_type, "title": title, "period": period, "url": url,
-                          "status": "ready" if chunks else "failed", "chunks": chunks})
-    if any(d["status"] == "ready" for d in documents):
+            progress(f"Downloading {len(todo)} document{'s' if len(todo) > 1 else ''}")
+        pool = ThreadPoolExecutor(max_workers=min(4, len(todo)))
+        futures = {pool.submit(_download, ticker, doc_type, period, url, max(5.0, remaining - 2)):
+                   (doc_type, title, period, url) for doc_type, title, period, url in todo}
+        read = 0
+        try:
+            for fut in as_completed(futures, timeout=remaining):
+                doc_type, title, period, url = futures[fut]
+                local = fut.result()
+                if local is None:
+                    documents[url]["status"] = "failed"
+                    continue
+                read += 1
+                if progress:
+                    progress(f"Reading {title} ({read} of {len(todo)})")
+                chunks = _index(ticker, doc_type, title, period, url, local)
+                documents[url].update(status="ready" if chunks else "failed", chunks=chunks)
+        except FuturesTimeout:
+            log.warning("document budget spent for %s; %d still downloading", ticker,
+                        sum(1 for d in documents.values() if d["status"] == "queued"))
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+    docs = list(documents.values())
+    if any(d.get("chunks") for d in docs):
         db.ensure_fts()
-    return {"ticker": ticker, "status": "ok", "documents": documents,
+    return {"ticker": ticker, "status": "ok", "documents": docs,
             "elapsed_s": round(time.time() - started, 1)}
 
 

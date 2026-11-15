@@ -63,9 +63,10 @@ def test_segment_guidance_is_not_graded_against_company_numbers():
 
 def test_long_term_target_is_not_held_to_one_quarter():
     target = claim("Q4FY26", "ebitda_margin", 25)
-    target["horizon"] = "long term"
+    target["quote"] = "our long-term margin aspiration is 25 percent"
     rows = grade([target], SERIES, ["Q4FY26"])
     assert rows[0]["status"] == "too_early" and rows[0]["delivered"] is None
+    assert rows[0]["term"] == "long"
 
 
 def test_company_level_wording():

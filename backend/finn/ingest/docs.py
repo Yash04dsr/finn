@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from pathlib import Path
 
 import httpx
@@ -86,17 +87,24 @@ def _strip_repeated_lines(text: str) -> str:
     return "\n".join(kept)
 
 
-def download_pdf(url: str, dest: Path) -> bool:
+def download_pdf(url: str, dest: Path, timeout: float = 30.0) -> bool:
+    """Download to a temp name and move into place, so a cut-off download is never read."""
+    partial = dest.with_suffix(".part")
+    deadline = time.monotonic() + timeout
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        with httpx.stream("GET", url, timeout=30, follow_redirects=True,
+        with httpx.stream("GET", url, timeout=min(timeout, 20.0), follow_redirects=True,
                           headers={"User-Agent": "Mozilla/5.0"}) as r:
             r.raise_for_status()
-            with open(dest, "wb") as f:
+            with open(partial, "wb") as f:
                 for block in r.iter_bytes(65536):
+                    if time.monotonic() > deadline:
+                        raise TimeoutError(f"took longer than {timeout:.0f}s")
                     f.write(block)
+        partial.replace(dest)
         return dest.stat().st_size > 10_000
     except Exception as exc:
+        partial.unlink(missing_ok=True)
         log.warning("pdf download failed %s: %s", url, exc)
         return False
 

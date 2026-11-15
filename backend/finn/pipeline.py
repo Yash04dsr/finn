@@ -21,6 +21,45 @@ from .ingest import nse_feed, prices as prices_ingest
 from .tools import portfolio as portfolio_tools
 
 log = logging.getLogger("finn.pipeline")
+SAMPLE_ANCHOR = "sample_anchor"
+
+
+def reanchor_sample(now: datetime | None = None) -> int:
+    """Move a stored sample day so it starts now: same filings and alerts, shifted in time.
+
+    A serverless instance starts from the database baked at build time; shifting is plain
+    SQL, where rerunning the pipeline would call Screener, yfinance and the model.
+    Returns the number of rows moved, or -1 when there is no stored sample day to move.
+    """
+    anchor_raw = db.get_setting(SAMPLE_ANCHOR)
+    if not anchor_raw:
+        return -1
+    now = now or datetime.now(timezone.utc)
+    delta = now - datetime.fromisoformat(anchor_raw)
+
+    def shift(raw: str | None) -> str | None:
+        if not raw:
+            return raw
+        try:
+            return (datetime.fromisoformat(raw) + delta).isoformat()
+        except ValueError:
+            return raw
+
+    moved = 0
+    with db.db() as c:
+        for row in c.execute("SELECT id, filed_at FROM filings WHERE is_demo=1").fetchall():
+            c.execute("UPDATE filings SET filed_at=? WHERE id=?", (shift(row["filed_at"]), row["id"]))
+            moved += 1
+        for row in c.execute("SELECT id, payload, event_at FROM alerts WHERE kind='announcement'").fetchall():
+            payload = db.json.loads(row["payload"])
+            if not payload.get("is_sample"):
+                continue
+            payload["filed_at"] = shift(payload.get("filed_at"))
+            c.execute("UPDATE alerts SET event_at=?, payload=? WHERE id=?",
+                      (shift(row["event_at"]), db.json.dumps(payload), row["id"]))
+            moved += 1
+    db.set_setting(SAMPLE_ANCHOR, now.isoformat())
+    return moved
 
 
 def announcement_key(ticker: str, headline: str, filed_at: str, is_sample: bool) -> str:
@@ -194,6 +233,8 @@ async def run_pipeline(hours: int = DEFAULT_WINDOW_HOURS, push: bool = True,
         except PushError as exc:
             log.warning("push failed: %s", exc)
 
+    if is_sample:
+        db.set_setting(SAMPLE_ANCHOR, started.isoformat())
     elapsed = (datetime.now(timezone.utc) - started).total_seconds()
     return {
         "ok": True,
