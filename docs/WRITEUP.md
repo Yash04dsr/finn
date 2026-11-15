@@ -19,6 +19,8 @@ Dear ENAM team,
 
 An Expo app (`mobile/`) is also kept in the repo as an additional native client speaking the same API.
 
+Each instance still works from SQLite in `/tmp`. Verdicts, the investor's own watchpoints and settings, and documents read for a company on demand are also written to Neon Postgres (`DATABASE_URL` on the backend) and loaded when an instance starts, so a recycled function keeps a decision that was already saved.
+
 **Key trade-offs.**
 1. *Web-first over Expo as the primary deliverable.* A Vercel URL opens immediately on any phone or desktop browser with zero install, no Expo Go tunnel drops, and one link to grade. The trade-off is that on iOS (16.4+), Web Push requires **Add to Home Screen** in Safari before notifications can be enabled.
 2. *Code decides numbers and promise checks; models read and write.* Numbers, ranking, `promise_check`, ledger grading, routing, and citation verification are deterministic Python with tests. Models handle ambiguous filing classification, guidance extraction, executive profiles, short lines, and research synthesis. An investor forgives a dry sentence, not a wrong number.
@@ -44,7 +46,7 @@ IIT Delhi – 2027
 
 ## Checklist before sending
 
-- [ ] Durable Render backend URL verified (`GET /healthz` → `research_ready: true`)
+- [x] Vercel backend health (`GET /healthz` → `research_ready: true`) and Neon for saved verdicts (`durable_state: true`)
 - [ ] Vercel web URL opens on phone (mobile data) and desktop in a private window
 - [x] GitHub repo: https://github.com/Yash04dsr/finn
 - [ ] AI build history exported (Cursor chats)
