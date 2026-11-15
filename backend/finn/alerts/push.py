@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 from pywebpush import WebPushException, webpush
 
@@ -22,24 +23,21 @@ VAPID_SUBJECT = "mailto:finn-demo@example.com"
 
 
 def ensure_vapid_keys() -> tuple[str, str]:
-    pub = db.get_setting(_VAPID_PUBLIC)
-    priv = db.get_setting(_VAPID_PRIVATE)
+    # Ephemeral hosts lose the settings table on restart; env keys keep existing
+    # browser subscriptions valid across cold starts.
+    pub = os.getenv(_VAPID_PUBLIC) or db.get_setting(_VAPID_PUBLIC)
+    priv = os.getenv(_VAPID_PRIVATE) or db.get_setting(_VAPID_PRIVATE)
     if pub and priv:
         return pub, priv
-    from py_vapid import Vapid
+    from cryptography.hazmat.primitives import serialization
+    from py_vapid import Vapid, b64urlencode
 
-    import os
-    import tempfile
-
-    with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
-        v = Vapid()
-        v.generate_keys()
-        v.save(f.name)
-        data = json.loads(open(f.name).read())
-        os.unlink(f.name)
-    # py_vapid writes private/public into the file
-    private_raw = data.get("privateKey") or data.get("private")
-    public_raw = data.get("publicKey") or data.get("public")
+    v = Vapid()
+    v.generate_keys()
+    private_raw = b64urlencode(v.private_key.private_numbers().private_value.to_bytes(32, "big"))
+    public_raw = b64urlencode(v.public_key.public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint,
+    ))
     db.set_setting(_VAPID_PRIVATE, private_raw)
     db.set_setting(_VAPID_PUBLIC, public_raw)
     return public_raw, private_raw
@@ -77,7 +75,7 @@ async def send_push(digest: dict, enriched: list[dict], threshold_alerts: list[d
         webpush(
             subscription_info=json.loads(sub_raw),
             data=json.dumps({"title": top["title"], "body": top["body"], "url": top["url"]}),
-            vapid_private_key=db.get_setting(_VAPID_PRIVATE),
+            vapid_private_key=ensure_vapid_keys()[1],
             vapid_claims={"sub": VAPID_SUBJECT},
         )
         return 1
@@ -98,7 +96,7 @@ async def _send_expo(token: str, top: dict) -> bool:
                 "https://exp.host/--/api/v2/push/send",
                 json={"to": token, "title": top["title"], "body": top["body"],
                       "sound": "default",
-                      "data": {"url": top["url"]}},
+                      "data": {"url": top["url"], "alertId": top.get("alert_id")}},
                 headers={"Accept": "application/json"},
                 timeout=10,
             )
@@ -145,21 +143,37 @@ async def _send_expo(token: str, top: dict) -> bool:
 
 
 def _pick_top(digest: dict, enriched: list[dict], threshold_alerts: list[dict]) -> dict | None:
-    """Choose the single item worth buzzing a phone for (priority 1 only)."""
-    for ann in sorted(enriched, key=lambda x: (x.get("priority", 4),), reverse=False):
-        if ann.get("priority") == 1:
-            return {
-                "title": f"{ann['ticker']}: {ann.get('category', '').replace('_', ' ')}",
-                "body": ann.get("summary") or ann.get("headline", "")[:120],
-                "url": f"/chat?ticker={ann['ticker']}&filing=1",
-            }
-    for a in sorted(threshold_alerts, key=lambda x: x.get("priority", 4)):
-        if a.get("priority") <= 2:
-            p = a.get("payload", {})
-            if a["kind"] == "volume_spike":
-                body = f"Volume {p.get('value')}x average (threshold {p.get('threshold')}x)"
-            else:
-                body = f"Moved {p.get('value'):+.1f}% today"
-            return {"title": f"{a['ticker']}: unusual move", "body": body,
-                    "url": f"/company/{a['ticker']}"}
+    """Choose the single stored alert worth buzzing a phone for, and link straight to it."""
+    for a in db.feed(since_hours=24, include_read=False):
+        if a["priority"] > (1 if a["kind"] == "announcement" else 2):
+            continue
+        p = a.get("payload") or {}
+        if a["kind"] == "announcement":
+            title = f"{a['ticker']}: {CATEGORY_TITLES.get(p.get('category'), 'new filing')}"
+            body = _facts_line(p) or p.get("summary") or (p.get("headline") or "")[:120]
+        elif a["kind"] == "volume_spike":
+            title = f"{a['ticker']}: unusual volume"
+            body = f"Volume {p.get('value')}x the 20-day average, against your {p.get('threshold')}x line"
+        else:
+            title = f"{a['ticker']}: sharp price move"
+            body = f"Moved {p.get('value'):+.1f}% today, past your ±{p.get('threshold')}% line"
+        return {"title": title, "body": body[:178], "url": f"/alert/{a['id']}", "alert_id": a["id"]}
     return None
+
+
+CATEGORY_TITLES = {
+    "results": "quarterly results", "management_change": "leadership change", "M&A": "acquisition",
+    "litigation": "legal or regulatory action", "pledging": "promoter pledge", "fund_raise": "fund raise",
+    "capex": "capacity investment", "insider_trading": "promoter trading", "credit_rating": "rating action",
+}
+
+
+def _facts_line(payload: dict) -> str:
+    """'Revenue +18% YoY, PAT −4% YoY' straight from the computed first cut."""
+    rows = {r.get("label"): r for r in (payload.get("facts") or {}).get("rows", [])}
+    parts = []
+    for label in ("Revenue", "EBITDA", "PAT"):
+        yoy = (rows.get(label) or {}).get("yoy_pct")
+        if yoy is not None:
+            parts.append(f"{label} {yoy:+.0f}% YoY")
+    return ", ".join(parts)

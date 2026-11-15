@@ -1,0 +1,11 @@
+.env
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+tests
+evals
+data/finn.db*
+data/docs/*.pdf
+brief.json
+render.yaml

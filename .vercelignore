@@ -1,0 +1,9 @@
+.env
+**/.env
+**/node_modules
+**/.next
+backend
+mobile
+docs
+.agents
+frontend/tsconfig.tsbuildinfo
