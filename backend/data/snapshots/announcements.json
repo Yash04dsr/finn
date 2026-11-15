@@ -2,8 +2,8 @@
  {
   "ticker": "PERSISTENT",
   "category": "results",
-  "headline": "Persistent Systems announces Q2 FY26 results; Board approves financial results for the quarter ended September 30, 2025",
-  "body": "Revenue from operations Rs 3,207 crore, up 4.1% QoQ and 22.8% YoY. EBITDA margin at 19.2%.",
+  "headline": "Persistent Systems announces {quarter} results; Board approves financial results for the quarter ended {quarter_end}",
+  "body": "Board approved the consolidated financial results for the quarter ended {quarter_end}.",
   "importance": 1,
   "filed_at": ""
  },
@@ -11,23 +11,23 @@
   "ticker": "PERSISTENT",
   "category": "management_change",
   "headline": "Resignation of Chief Financial Officer - Mr. Sunil Sapre steps down; Mr. Piyush Pandey appointed as interim financial controller",
-  "body": "Mr. Sunil Sapre, CFO, has resigned effective November 30, 2025 to pursue an opportunity outside the organization.",
+  "body": "Mr. Sunil Sapre, CFO, has resigned effective the end of next month to pursue an opportunity outside the organization.",
   "importance": 1,
   "filed_at": ""
  },
  {
   "ticker": "PERSISTENT",
   "category": "earnings_call",
-  "headline": "Intimation of earnings conference call for Q2 FY26 financial results",
-  "body": "Conference call on October 23, 2025 at 5:00 PM IST. Dial-in details on the investor relations page.",
+  "headline": "Intimation of earnings conference call for {quarter} financial results",
+  "body": "Conference call at 5:00 PM IST on the day of the results. Dial-in details on the investor relations page.",
   "importance": 2,
   "filed_at": ""
  },
  {
   "ticker": "CROMPTON",
   "category": "results",
-  "headline": "Crompton Greaves Consumer Electricals Ltd -Declaration of Audited Financial Results for the quarter and half year ended September 30, 2025",
-  "body": "Revenue Rs 2,112 crore, up 9.4% YoY. PAT Rs 168 crore.",
+  "headline": "Crompton Greaves Consumer Electricals Ltd -Declaration of Financial Results for the quarter ended {quarter_end}",
+  "body": "Board approved the financial results for the quarter ended {quarter_end}.",
   "importance": 1,
   "filed_at": ""
  },
@@ -42,8 +42,8 @@
  {
   "ticker": "TITAN",
   "category": "results",
-  "headline": "Titan Company Ltd - Board Meeting Intimation for approval of Un-Audited Financial Results for Q2 FY26",
-  "body": "Board meeting scheduled November 5, 2025 to consider quarterly results.",
+  "headline": "Titan Company Ltd - Board Meeting Intimation for approval of Un-Audited Financial Results for {next_quarter}",
+  "body": "Board meeting scheduled to consider the {next_quarter} results.",
   "importance": 2,
   "filed_at": ""
  },
@@ -51,7 +51,7 @@
   "ticker": "TITAN",
   "category": "dividend",
   "headline": "Titan Company Ltd - Declared interim dividend of Rs 11 per share; record date fixed",
-  "body": "Interim dividend of Rs 11 per equity share. Record date: November 18, 2025.",
+  "body": "Interim dividend of Rs 11 per equity share. Record date fixed two weeks out.",
   "importance": 2,
   "filed_at": ""
  },
@@ -75,7 +75,7 @@
   "ticker": "RELIANCE",
   "category": "insider_trading",
   "headline": "RELIANCE - Disclosure under SEBI PIT regulations: promoter group acquisition of 12.4 lakh shares",
-  "body": "Promoter group acquired 12.4 lakh equity shares via open market between Nov 3-6, 2025.",
+  "body": "Promoter group acquired 12.4 lakh equity shares via open market this week.",
   "importance": 2,
   "filed_at": ""
  },
@@ -90,8 +90,8 @@
  {
   "ticker": "HDFCBANK",
   "category": "results",
-  "headline": "HDFC Bank - Asset liabilities committee approves Q2 FY26 results filing with exchanges",
-  "body": "NII up 7.6% YoY. Deposits growth 15.2% YoY.",
+  "headline": "HDFC Bank - Board approves financial results for the quarter ended {quarter_end}",
+  "body": "Board approved the standalone and consolidated results for {quarter}.",
   "importance": 1,
   "filed_at": ""
  },
@@ -99,7 +99,7 @@
   "ticker": "HDFCBANK",
   "category": "unclassified",
   "headline": "HDFC Bank - Allotment of ESOP shares under Employee Stock Option Scheme",
-  "body": "2,84,500 equity shares allotted under ESOP on November 6, 2025.",
+  "body": "2,84,500 equity shares allotted under ESOP.",
   "importance": 4,
   "filed_at": ""
  },
@@ -115,7 +115,7 @@
   "ticker": "TCS",
   "category": "postal_ballot",
   "headline": "TCS - Postal ballot results: resolution on reappointment passed",
-  "body": "99.4% votes in favour. Voting period ended November 4, 2025.",
+  "body": "99.4% votes in favour. Voting period ended this week.",
   "importance": 3,
   "filed_at": ""
  },
@@ -123,7 +123,7 @@
   "ticker": "TCS",
   "category": "investor_meetings",
   "headline": "TCS - Schedule of analyst / institutional investor meetings",
-  "body": "Meetings with international institutional investors during November 10-14, 2025.",
+  "body": "Meetings with international institutional investors over the coming week.",
   "importance": 3,
   "filed_at": ""
  },
@@ -163,7 +163,7 @@
   "ticker": "FEDERALBNK",
   "category": "management_change",
   "headline": "The Federal Bank Ltd - Appointment of Mr. Kalyan Gurazada as Chief Financial Officer of the Bank",
-  "body": "The Board appointed Mr. Kalyan Gurazada as CFO effective November 14, 2025, succeeding Mr. Ashutosh Khajuria upon superannuation.",
+  "body": "The Board appointed Mr. Kalyan Gurazada as CFO, succeeding Mr. Ashutosh Khajuria upon superannuation.",
   "importance": 1,
   "filed_at": ""
  },
@@ -186,7 +186,7 @@
  {
   "ticker": "ASIANPAINT",
   "category": "unclassified",
-  "headline": "Asian Paints - Shareholding pattern for the quarter ended September 30, 2025",
+  "headline": "Asian Paints - Shareholding pattern for the quarter ended {quarter_end}",
   "body": "Shareholding pattern filed under Regulation 31(1)(b).",
   "importance": 4,
   "filed_at": ""
@@ -202,7 +202,7 @@
  {
   "ticker": "SUPREMEIND",
   "category": "press_release",
-  "headline": "Supreme Industries - October 2025 monthly business update",
+  "headline": "Supreme Industries - {last_month} monthly business update",
   "body": "Pipes volume growth 8% YoY; molded furniture flat.",
   "importance": 3,
   "filed_at": ""
@@ -210,8 +210,8 @@
  {
   "ticker": "BHARATFORG",
   "category": "results",
-  "headline": "Bharat Forge - Outcome of Board Meeting - Approved un-audited financial results for Q2 FY26",
-  "body": "Consolidated revenue Rs 4,271 crore, up 6% YoY.",
+  "headline": "Bharat Forge - Outcome of Board Meeting - Approved un-audited financial results for {quarter}",
+  "body": "Board approved the un-audited consolidated results for the quarter ended {quarter_end}.",
   "importance": 1,
   "filed_at": ""
  },
@@ -250,8 +250,8 @@
  {
   "ticker": "NEULANDLAB",
   "category": "results",
-  "headline": "Neuland Laboratories - Financial results updates for the quarter ended September 30, 2025",
-  "body": "Revenue Rs 261 crore, up 18% YoY on strong GLP-1 peptide demand.",
+  "headline": "Neuland Laboratories - Financial results updates for the quarter ended {quarter_end}",
+  "body": "Board approved the financial results for the quarter ended {quarter_end}.",
   "importance": 1,
   "filed_at": ""
  },
@@ -274,15 +274,15 @@
  {
   "ticker": "IRCTC",
   "category": "results",
-  "headline": "IRCTC - Outcome of Board Meeting - financial results for the quarter ended September 30, 2025",
-  "body": "Revenue Rs 1,017 crore, up 7.2% YoY. PAT Rs 307 crore.",
+  "headline": "IRCTC - Outcome of Board Meeting - financial results for the quarter ended {quarter_end}",
+  "body": "Board approved the financial results for the quarter ended {quarter_end}.",
   "importance": 1,
   "filed_at": ""
  },
  {
   "ticker": "IRCTC",
   "category": "dividend",
-  "headline": "IRCTC - Interim dividend Rs 5 per share; record date November 21, 2025",
+  "headline": "IRCTC - Interim dividend Rs 5 per share; record date fixed",
   "body": "Board declared interim dividend of Rs 5 per share.",
   "importance": 2,
   "filed_at": ""
@@ -298,7 +298,7 @@
  {
   "ticker": "PAYTM",
   "category": "management_change",
-  "headline": "One 97 Communications (Paytm) - CFO transition: new CFO appointment effective December 1, 2025",
+  "headline": "One 97 Communications (Paytm) - CFO transition: new CFO appointment effective next month",
   "body": "Mr. Rajesh Kumar succeeds the outgoing CFO; outgoing CFO to support transition till year end.",
   "importance": 1,
   "filed_at": ""

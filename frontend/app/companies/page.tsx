@@ -4,6 +4,7 @@ import { type FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { TickerQuote } from "@/lib/types";
+import { ApiError, api } from "@/lib/api";
 import { fetchers, useApi } from "@/lib/useApi";
 import { pct, rupees, toneFor } from "@/lib/format";
 import Header from "@/components/Header";
@@ -15,24 +16,36 @@ export default function CompaniesPage() {
   const { data, loading, error, reload } = useApi(fetchers.companies, []);
   const [ticker, setTicker] = useState("");
   const [validation, setValidation] = useState("");
+  const [resolving, setResolving] = useState(false);
 
   const rows: TickerQuote[] = [...(data?.portfolio ?? []), ...(data?.adhoc ?? [])];
   const portfolioCount = data?.portfolio?.length ?? 0;
   const adhocCount = data?.adhoc?.length ?? 0;
 
-  const openResearch = (event: FormEvent<HTMLFormElement>) => {
+  const openResearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const normalized = ticker.trim().toUpperCase();
-    if (!normalized) {
-      setValidation("Enter a ticker symbol.");
+    const query = ticker.trim();
+    if (!query) {
+      setValidation("Enter a symbol or company name.");
       return;
     }
-    if (!/^[A-Z0-9&.-]{1,20}$/.test(normalized)) {
-      setValidation("Use up to 20 letters, numbers, ampersands, dots, or hyphens.");
-      return;
-    }
+    const asSymbol = query.toUpperCase();
+    const symbolLike = /^[A-Z0-9&.-]{1,20}$/.test(asSymbol);
     setValidation("");
-    router.push(`/company/${encodeURIComponent(normalized)}`);
+    setResolving(true);
+    try {
+      const { ticker: found } = await api.resolve(query);
+      router.push(`/company/${encodeURIComponent(found)}`);
+    } catch (err) {
+      // An unlisted symbol still opens: the company page says plainly if nothing covers it.
+      if (symbolLike && !(err instanceof ApiError && err.status === 400)) {
+        router.push(`/company/${encodeURIComponent(asSymbol)}`);
+      } else {
+        setValidation("No listed company matches that. Try the NSE symbol, such as DIXON.");
+      }
+    } finally {
+      setResolving(false);
+    }
   };
 
   return (
@@ -43,11 +56,11 @@ export default function CompaniesPage() {
         <section aria-labelledby="ticker-search-title">
           <h1 id="ticker-search-title" className="display text-[22px] leading-tight">Open any listed company</h1>
           <p className="mt-1 max-w-[65ch] text-[14px] leading-relaxed text-[#4B5563]">
-            Enter an NSE or BSE symbol. For a company FINN has not read, it fetches the newest calls and grades management&apos;s promises, or says plainly that primary sources do not cover it.
+            Enter an NSE or BSE symbol, or the company&apos;s name. For a company FINN has not read, it fetches the newest calls and grades management&apos;s promises, or says plainly that primary sources do not cover it.
           </p>
           <form className="mt-3" onSubmit={openResearch} noValidate>
             <label htmlFor="ticker-search" className="text-[13px] font-semibold text-[#000000]">
-              Ticker symbol
+              Symbol or company name
             </label>
             <div className="mt-1.5 flex gap-2">
               <input
@@ -55,18 +68,18 @@ export default function CompaniesPage() {
                 name="ticker"
                 value={ticker}
                 onChange={(event) => {
-                  setTicker(event.target.value.toUpperCase());
+                  setTicker(event.target.value);
                   if (validation) setValidation("");
                 }}
                 autoComplete="off"
-                autoCapitalize="characters"
+                autoCapitalize="words"
                 spellCheck={false}
-                maxLength={20}
+                maxLength={80}
                 list="tracked-tickers"
                 aria-describedby={validation ? "ticker-error" : "ticker-hint"}
                 aria-invalid={Boolean(validation)}
-                className="field min-w-0 flex-1 font-semibold uppercase tracking-wide placeholder:font-normal placeholder:normal-case placeholder:tracking-normal"
-                placeholder="e.g. DIXON"
+                className="field min-w-0 flex-1 font-semibold tracking-wide placeholder:font-normal placeholder:tracking-normal"
+                placeholder="e.g. DIXON or Dixon Technologies"
               />
               <datalist id="tracked-tickers">
                 {rows.map((row) => <option key={row.ticker} value={row.ticker} />)}
@@ -74,8 +87,10 @@ export default function CompaniesPage() {
               <button
                 type="submit"
                 className="btn btn-primary shrink-0"
+                disabled={resolving}
+                aria-busy={resolving}
               >
-                Open
+                {resolving ? "Finding" : "Open"}
               </button>
             </div>
             {validation ? (

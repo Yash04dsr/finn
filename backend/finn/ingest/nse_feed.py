@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -114,8 +115,59 @@ def fetch_announcements(snapshot_anchor: datetime | None = None, sample: bool = 
         return live, "live"
     snap = [r for r in load_snapshot() if not tickers or r["ticker"] in tickers]
     log.info("Using the labelled sample day (%d filings)", len(snap))
-    rows = [{**r, "source": "sample"} for r in snap]
+    rows = fill_sample(snap, snapshot_anchor)
     return _redate(rows, anchor=snapshot_anchor), "sample"
+
+
+MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August",
+               "September", "October", "November", "December"]
+
+
+def fill_sample(rows: list[dict], anchor: datetime | None = None) -> list[dict]:
+    """Date the sample day's wording to each company's latest stored quarter.
+
+    A sample results filing then names the same quarter its first-cut numbers and
+    promise check are computed from, instead of a fixed past quarter.
+    """
+    now = anchor or datetime.now(timezone.utc)
+    fields: dict[str, dict[str, str]] = {}
+    out = []
+    for r in rows:
+        values = fields.setdefault(r["ticker"], sample_fields(r["ticker"], now))
+        filled = dict(r, source="sample")
+        for key in ("headline", "body"):
+            text = str(filled.get(key) or "")
+            for name, value in values.items():
+                text = text.replace("{" + name + "}", value)
+            filled[key] = text
+        out.append(filled)
+    return out
+
+
+def sample_fields(ticker: str, now: datetime) -> dict[str, str]:
+    from .. import db
+
+    latest = db.quarterly_series(ticker, limit=1)
+    if latest and re.fullmatch(r"Q[1-4]FY\d{2}", latest[-1]["period"]):
+        quarter, fy = int(latest[-1]["period"][1]), int(latest[-1]["period"][4:])
+    else:
+        # The last quarter that ended before the anchor, in the Indian fiscal year.
+        q_month = ((now.month - 1) // 3) * 3 or 12
+        year = now.year if q_month != 12 else now.year - 1
+        quarter = {6: 1, 9: 2, 12: 3, 3: 4}[q_month]
+        fy = (year + (0 if quarter == 4 else 1)) % 100
+    end_month = {1: 6, 2: 9, 3: 12, 4: 3}[quarter]
+    end_year = 2000 + fy - (0 if quarter == 4 else 1)
+    end_day = {3: 31, 6: 30, 9: 30, 12: 31}[end_month]
+    nq, nfy = (quarter + 1, fy) if quarter < 4 else (1, fy + 1)
+    prev_month = (now.month - 2) % 12 + 1
+    prev_year = now.year if now.month > 1 else now.year - 1
+    return {
+        "quarter": f"Q{quarter} FY{fy:02d}",
+        "quarter_end": f"{MONTH_NAMES[end_month - 1]} {end_day}, {end_year}",
+        "next_quarter": f"Q{nq} FY{nfy:02d}",
+        "last_month": f"{MONTH_NAMES[prev_month - 1]} {prev_year}",
+    }
 
 
 def _redate(rows: list[dict], hours_back: int = 20,

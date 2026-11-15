@@ -49,3 +49,22 @@ def test_company_questions_route_to_the_research_analyst():
 
 def test_lowercase_short_words_are_not_tickers():
     assert detect_ticker("is it on track") is None
+
+
+def test_unseen_listed_companies_route_by_symbol_or_name():
+    for message, symbol in [
+        ("What did DIXON guide for FY26?", "DIXON"),
+        ("What did Dixon Technologies guide for FY26?", "DIXON"),
+        ("what did dixon guide for fy26", "DIXON"),
+        ("How is Bajaj Auto doing?", "BAJAJ-AUTO"),
+        ("What did Larsen & Toubro say about orders?", "LT"),
+        ("Hindustan Unilever volume growth?", "HINDUNILVR"),
+        ("What did M&M say on EV capex?", "M&M"),
+    ]:
+        assert route(message, None, None) == ("research", symbol), message
+
+
+def test_generic_and_off_topic_questions_stay_with_the_assistant():
+    for message in ["What is the capital of France?", "Explain EBITDA margin", "Is the total risk high?",
+                    "WHAT IS THE GUIDANCE", "Write me a poem about rain", "Is IT sector weak?"]:
+        assert route(message, None, None) == ("assistant", None), message

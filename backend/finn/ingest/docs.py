@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 
 from .. import db
-from ..config import DOCS_DIR
+from ..config import DOCS_DIR, PDF_DIR
 
 log = logging.getLogger("finn.docs")
 
@@ -110,7 +110,7 @@ def ingest_ticker_docs(ticker: str, docs: list[dict], max_docs: int = 6) -> int:
             if not d.get("url"):
                 continue
             fname = f"{ticker}_{d['doc_type']}_{abs(hash(d['url'])) % 10**8}.pdf"
-            local = DOCS_DIR / fname
+            local = PDF_DIR / fname
             if not download_pdf(d["url"], local):
                 continue
         n = ingest_pdf(ticker, d["doc_type"], d.get("title", d["doc_type"]),

@@ -96,6 +96,38 @@ def test_chat_rejects_invalid_session_id(client):
     assert r.status_code == 400
 
 
+def test_resolve_maps_names_and_symbols(client):
+    assert client.get("/api/resolve", params={"q": "Dixon Technologies"}).json()["ticker"] == "DIXON"
+    hit = client.get("/api/resolve", params={"q": "kaynes"}).json()
+    assert hit["ticker"] == "KAYNES" and hit["name"].startswith("Kaynes")
+    assert client.get("/api/resolve", params={"q": "the capital of France"}).status_code == 404
+    assert client.get("/api/resolve", params={"q": " "}).status_code == 400
+
+
+def test_chat_sends_an_unseen_ticker_to_primary_source_research(client, monkeypatch):
+    import json
+
+    async def no_network(_ticker, **_kwargs):
+        return None
+
+    fetched = []
+    monkeypatch.setattr("finn.api.main._hydrate_company", no_network)
+    monkeypatch.setattr("finn.ingest.discovery.ensure_research_docs",
+                        lambda ticker, *a, **k: fetched.append(ticker) or {"documents": []})
+
+    class NoModel:
+        async def get_session(self, **_kwargs):
+            raise RuntimeError("no model in tests")
+
+    monkeypatch.setattr("finn.api.main.get_research_runner",
+                        lambda: type("Runner", (), {"session_service": NoModel()})())
+    r = client.post("/api/chat", json={"message": "What did DIXON guide for FY26?"})
+    events = [json.loads(line[6:]) for line in r.text.splitlines() if line.startswith("data: ")]
+    assert events[0] == {"type": "route", "lane": "research", "ticker": "DIXON"}
+    assert any(e.get("type") == "tool" and "transcript" in e.get("tool_name", "") for e in events)
+    assert fetched == ["DIXON"]
+
+
 def test_costs_shape(client):
     r = client.get("/api/costs")
     assert r.status_code == 200

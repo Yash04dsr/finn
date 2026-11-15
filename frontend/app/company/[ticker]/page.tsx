@@ -218,6 +218,23 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
               </section>
             ) : null}
 
+            <section aria-labelledby="ask-title">
+              <SectionHeader id="ask-title" title="Ask the filings" hint="annual reports and calls only" />
+              <ul>
+                {researchQuestions(ticker).map((q) => (
+                  <li key={q}>
+                    <Link
+                      href={`/chat?ticker=${encodeURIComponent(ticker)}&q=${encodeURIComponent(q)}`}
+                      className="flex min-h-12 items-center justify-between gap-3 border-t border-[#E5E7EB] text-[15px] hover:bg-black/[0.02]"
+                    >
+                      {q}
+                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#6B7280]" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
             <section aria-labelledby="history-title">
               <SectionHeader id="history-title" title="Your decisions" hint={decisions?.length || undefined} />
               {decisions === null ? (
@@ -277,6 +294,17 @@ export default function CompanyPage({ params }: { params: Promise<{ ticker: stri
 function toneColor(v: number | null | undefined) {
   const t = toneFor(v);
   return t === "pos" ? "#1E6B4F" : t === "neg" ? "#B4442C" : "#4B5563";
+}
+
+/** The research views an investor reaches for, phrased so the answer must come from the company's own documents. */
+function researchQuestions(t: string): string[] {
+  return [
+    `What does ${t} do, and how is its revenue split by segment?`,
+    `What did ${t} guide on growth, margins and capex?`,
+    `How much debt does ${t} carry, and how long is its working-capital cycle?`,
+    `Does ${t} turn its profits into operating cash?`,
+    `What is the bull case and the bear case for ${t}, from its own filings?`,
+  ];
 }
 
 function coverageText(c: CompanyResponse): string {

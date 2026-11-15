@@ -16,6 +16,8 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BACKEND_DIR / "data"
 SNAPSHOT_DIR = DATA_DIR / "snapshots"
 DOCS_DIR = DATA_DIR / "docs"
+# Serverless hosts mount the bundle read-only; downloaded PDFs must go to a writable dir.
+PDF_DIR = Path(os.getenv("FINN_PDF_DIR", str(DOCS_DIR))).expanduser()
 BUNDLED_DB_PATH = DATA_DIR / "finn.db"
 DB_PATH = Path(os.getenv("FINN_DB_PATH", str(BUNDLED_DB_PATH))).expanduser()
 

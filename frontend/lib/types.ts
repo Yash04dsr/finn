@@ -56,6 +56,9 @@ export type PromiseCheck = {
   status: "kept" | "missed" | "no_guidance" | "not_reported";
   note: string;
   is_illustrative: boolean;
+  /** The filing is a sample-day stand-in; the numbers and guidance may still be real. */
+  is_sample_filing?: boolean;
+  numbers_source?: string | null;
 };
 
 export interface Alert {

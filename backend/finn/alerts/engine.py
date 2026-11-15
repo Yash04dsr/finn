@@ -126,14 +126,15 @@ BASE_TIER = {
     "investor_meetings": 4, "postal_ballot": 4, "agm_egm": 4, "unclassified": 4,
 }
 
+_ADVANCE_NOTICE = re.compile(r"intimation|to consider|will consider", re.I)
+
 # Headline wording that changes how much a filing matters, checked in order.
 HEADLINE_RULES: list[tuple[re.Pattern, int, str]] = [
     (re.compile(r"esop|employee stock option|shareholding pattern|compliance certificate|"
                 r"duplicate (share )?certificate|loss of share certificate|newspaper|trading window|"
                 r"regulation 74|postal ballot result|egm result|agm result|schedule of analyst",
                 re.I), 4, "routine paperwork"),
-    (re.compile(r"intimation|to consider|will consider", re.I), 3,
-     "a notice of an upcoming event, not the event itself"),
+    (_ADVANCE_NOTICE, 3, "a notice of an upcoming event, not the event itself"),
     (re.compile(r"reaffirm", re.I), 3, "a reaffirmed rating, so nothing changed"),
     (re.compile(r"commercial paper", re.I), 3, "routine short-term borrowing"),
     (re.compile(r"release of (shares )?pledge|pledge(d)? .*released|revocation of pledge", re.I), 3,
@@ -142,6 +143,11 @@ HEADLINE_RULES: list[tuple[re.Pattern, int, str]] = [
     (re.compile(r"secures? orders?|order (win|inflow)|bags? order", re.I), 2, "a new order win"),
     (re.compile(r"buyback", re.I), 2, "a buyback returns cash to shareholders"),
 ]
+
+def is_advance_notice(headline: str) -> bool:
+    """A notice that results or a meeting are coming, not the results themselves."""
+    return bool(_ADVANCE_NOTICE.search(headline or ""))
+
 
 CATEGORY_WORDS = {
     "M&A": "an acquisition or merger", "management_change": "a leadership change",

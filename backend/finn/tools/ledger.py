@@ -27,6 +27,33 @@ _TRACKED = re.compile(r"revenue|sales|growth|ebitda|ebit|margin|profit|cost|cape
 _GUIDE = re.compile(r"\b(guid\w*|expect\w*|target\w*|aspir\w*|outlook|band|range|exit\w*|"
                     r"we will|we should|full year|next year|by fy\w*|trajectory|deliver)\b", re.I)
 GRADABLE = {"revenue_growth", "ebitda_margin", "ebit_margin", "pat_margin"}
+# Guidance for one part of the company ("India business", "defence margins") cannot be
+# checked against the consolidated numbers FINN stores.
+_SEGMENT = re.compile(
+    r"\b(?:segments?|divisions?|verticals?|subsidiar\w*|exports?|domestic|international|overseas|"
+    r"defen[cs]e|aerospace|geograph\w*)\b"
+    r"|\b(?!(?:our|the|this|overall|total|whole|entire|consolidated|core)\b)[a-z]+ (?:business|portfolio)\b",
+    re.I,
+)
+
+
+def company_level(metric: str | None, quote: str | None) -> bool:
+    """Whether a promise is about the whole company rather than one segment or region."""
+    return not _SEGMENT.search(f"{metric or ''} {quote or ''}")
+
+
+# A target years out is not tested by one quarter's numbers.
+_LONG_HORIZON = re.compile(r"long[- ]term|medium[- ]term|multi[- ]?year|over (?:a period of )?time|"
+                           r"\b\d+\s*(?:to|-)?\s*\d*\s*years\b", re.I)
+
+
+def long_horizon(horizon: str | None) -> bool:
+    return bool(_LONG_HORIZON.search(horizon or ""))
+
+
+def checkable_now(claim: dict) -> bool:
+    """A company-wide promise that the latest quarter can fairly be held to."""
+    return company_level(claim.get("metric"), claim.get("quote")) and not long_horizon(claim.get("horizon"))
 
 EXTRACT_PROMPT = """You read passages from one company's earnings call and list management's explicit forward-looking commitments that contain a number.
 
@@ -167,17 +194,22 @@ def grade(claims: list[dict], series: list[dict], transcript_periods: list[str])
     rows: list[dict] = []
     seen: set[tuple] = set()
     for cl in sorted(claims, key=lambda c: period_key(c["period"]), reverse=True):
-        key = (cl["kind"] if cl["kind"] != "other" else cl["metric"].lower(), cl["period"])
+        whole = company_level(cl.get("metric"), cl.get("quote"))
+        key = (cl["kind"] if cl["kind"] != "other" and whole else cl["metric"].lower(), cl["period"])
         if key in seen:
             continue
         seen.add(key)
         later_quarters = [r["period"] for r in series if period_key(r["period"]) > period_key(cl["period"])]
-        later_claims = [o for o in claims if o["kind"] == cl["kind"] and cl["kind"] != "other"
-                        and o["unit"] == cl["unit"]
+        later_claims = [o for o in claims if o["kind"] == cl["kind"] and cl["kind"] != "other" and whole
+                        and o["unit"] == cl["unit"] and company_level(o.get("metric"), o.get("quote"))
                         and period_key(o["period"]) > period_key(cl["period"])]
         later_calls = [p for p in transcript_periods if period_key(p) > period_key(cl["period"])]
         status, delivered, delivered_period, note = "not_checkable", None, None, ""
-        if cl["kind"] in GRADABLE and cl["unit"] in ("%",) and cl["lo"] is not None:
+        if cl["kind"] in GRADABLE and not whole:
+            note = "Guidance for one part of the business; reported numbers are company-wide"
+        elif cl["kind"] in GRADABLE and long_horizon(cl.get("horizon")):
+            status, note = "too_early", "A longer-term target; one quarter does not test it"
+        elif cl["kind"] in GRADABLE and cl["unit"] in ("%",) and cl["lo"] is not None:
             if later_quarters:
                 delivered_period = later_quarters[-1]
                 delivered = _delivered(cl["kind"], series, delivered_period)
@@ -192,7 +224,7 @@ def grade(claims: list[dict], series: list[dict], transcript_periods: list[str])
             if _band(newer) != _band(cl):
                 status = "revised" if status in ("not_checkable", "too_early", "kept", "missed") else status
                 note = f"Later guided {_band(newer)} on the {newer['period']} call"
-        elif later_calls and cl["kind"] != "other" and status in ("not_checkable", "too_early"):
+        elif later_calls and cl["kind"] != "other" and whole and status in ("not_checkable", "too_early"):
             status = "gone_quiet"
             note = f"No number given for this on {len(later_calls)} later call{'s' if len(later_calls) > 1 else ''}"
         rows.append({
@@ -200,6 +232,7 @@ def grade(claims: list[dict], series: list[dict], transcript_periods: list[str])
             "band": _band(cl), "lo": cl.get("lo"), "hi": cl.get("hi"), "unit": cl.get("unit"),
             "horizon": cl["horizon"], "quote": cl["quote"], "speaker": cl["speaker"],
             "status": status, "delivered": delivered, "delivered_period": delivered_period, "note": note,
+            "company_level": whole,
             "promise_source": _source(cl["chunk_id"]),
             "delivered_source": ({"provider": "Screener quarterly table, compiled from exchange filings",
                                   "period": delivered_period} if delivered is not None else None),

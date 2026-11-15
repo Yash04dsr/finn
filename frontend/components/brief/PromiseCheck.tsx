@@ -8,6 +8,10 @@ function IllustrativeTag() {
   return <span className="chip bg-[#F5F1E8] text-black">Illustrative</span>;
 }
 
+function SampleFilingTag() {
+  return <span className="chip bg-[#F5F1E8] text-black">Sample filing</span>;
+}
+
 /** Compact promise check for the focus card: verdict chip, one sentence, both sources a tap away. */
 export function PromiseCheckRow({ pc }: { pc: PromiseCheckType }) {
   if (pc.status === "no_guidance") {
@@ -23,7 +27,7 @@ export function PromiseCheckRow({ pc }: { pc: PromiseCheckType }) {
       <div className="flex items-center gap-2">
         <h3 className="label">Promise check</h3>
         <StatusChip status={pc.status} />
-        {pc.is_illustrative ? <IllustrativeTag /> : null}
+        {pc.is_illustrative ? <IllustrativeTag /> : pc.is_sample_filing ? <SampleFilingTag /> : null}
       </div>
       <p
         className={`num mt-1.5 leading-snug ${
@@ -59,7 +63,7 @@ export function PromiseCheckPanel({ pc }: { pc: PromiseCheckType }) {
           Promise check
         </h2>
         <StatusChip status={pc.status} />
-        {pc.is_illustrative ? <IllustrativeTag /> : null}
+        {pc.is_illustrative ? <IllustrativeTag /> : pc.is_sample_filing ? <SampleFilingTag /> : null}
       </div>
       <p className="mt-2 text-[16px] font-semibold leading-snug">{promiseSentence(pc)}</p>
 
@@ -77,6 +81,12 @@ export function PromiseCheckPanel({ pc }: { pc: PromiseCheckType }) {
       {pc.is_illustrative ? (
         <p className="mt-2 text-[12.5px] leading-snug text-[#4B5563]">
           Sample-day numbers. FINN does not grade them as real outcomes.
+        </p>
+      ) : pc.is_sample_filing && pc.status !== "no_guidance" ? (
+        <p className="mt-2 text-[12.5px] leading-snug text-[#4B5563]">
+          The filing is a sample-day stand-in. The guided band is quoted from the company&rsquo;s own call and the
+          delivered figure is its reported {fmtPeriod(pc.delivered_period) || "latest"} number
+          {pc.numbers_source ? ` (${pc.numbers_source})` : ""}.
         </p>
       ) : null}
     </section>

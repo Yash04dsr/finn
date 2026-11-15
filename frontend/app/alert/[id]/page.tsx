@@ -89,7 +89,11 @@ export default function EvidencePage({ params }: { params: Promise<{ id: string 
               ) : null}
               {p.is_sample ? (
                 <div className="mt-3">
-                  <SampleNote>Sample-day filing used for the demo. Its numbers are illustrative.</SampleNote>
+                  <SampleNote>
+                    {p.facts && !p.facts.is_illustrative
+                      ? `Sample-day filing used for the demo. The numbers below are ${alert.ticker}'s reported ${fmtPeriod(p.facts.period) || "latest"} figures.`
+                      : "Sample-day filing used for the demo. Its numbers are illustrative."}
+                  </SampleNote>
                 </div>
               ) : null}
               {past && !saved ? (

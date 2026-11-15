@@ -17,7 +17,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from .. import db
-from ..config import DOCS_DIR
+from ..config import PDF_DIR
 
 log = logging.getLogger("finn.discovery")
 
@@ -108,7 +108,7 @@ def _fetch_and_index(ticker: str, doc_type: str, title: str, period: str, url: s
     from .docs import download_pdf, ingest_pdf
 
     safe = re.sub(r"[^A-Za-z0-9]", "", period or doc_type)
-    local = DOCS_DIR / f"{ticker}_{doc_type}_{safe}_{abs(hash(url)) % 10**8}.pdf"
+    local = PDF_DIR / f"{ticker}_{doc_type}_{safe}_{abs(hash(url)) % 10**8}.pdf"
     if not (local.exists() and local.stat().st_size > 10_000) and not download_pdf(url, local):
         return 0
     return ingest_pdf(ticker, doc_type, title, period, url, local)

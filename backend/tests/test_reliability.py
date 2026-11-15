@@ -1,6 +1,7 @@
 """Regression tests for public-demo reliability and repeat-run idempotency."""
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -110,6 +111,55 @@ async def test_sample_day_rerun_refreshes_instead_of_duplicating(monkeypatch):
     assert matching[0]["payload"]["is_sample"] is True
     recent = [a for a in db.feed(since_hours=24, include_read=True) if a["ticker"] == "PIPECO"]
     assert len(recent) == 1, "the rerun moved the sample filing into the current window"
+
+
+def test_sample_results_name_the_quarter_their_numbers_come_from():
+    from finn.ingest.nse_feed import fill_sample
+    from finn.tools.metrics import first_cut
+
+    db.put_quarterly("SMPCO", [
+        {"period": "Q1FY27", "period_end": "2026-06-30", "revenue": 100.0, "ebitda": 20.0},
+        {"period": "Q2FY27", "period_end": "2026-09-30", "revenue": 110.0, "ebitda": 21.0},
+    ])
+    row = fill_sample([{"ticker": "SMPCO", "headline": "SMPCO {quarter} results",
+                        "body": "Quarter ended {quarter_end}; next is {next_quarter}."}],
+                      datetime(2026, 11, 15, tzinfo=timezone.utc))[0]
+    assert row["headline"] == "SMPCO Q2 FY27 results"
+    assert row["body"] == "Quarter ended September 30, 2026; next is Q3 FY27."
+    assert first_cut("SMPCO")["period"] == "Q2FY27"
+
+
+def test_sample_quarter_falls_back_to_the_last_completed_quarter():
+    from finn.ingest.nse_feed import sample_fields
+
+    assert sample_fields("NODATA", datetime(2026, 11, 15, tzinfo=timezone.utc))["quarter"] == "Q2 FY27"
+    jan = sample_fields("NODATA", datetime(2027, 1, 10, tzinfo=timezone.utc))
+    assert (jan["quarter"], jan["quarter_end"]) == ("Q3 FY27", "December 31, 2026")
+    apr = sample_fields("NODATA", datetime(2027, 4, 20, tzinfo=timezone.utc))
+    assert (apr["quarter"], apr["quarter_end"], apr["next_quarter"]) == ("Q4 FY27", "March 31, 2027", "Q1 FY28")
+
+
+def test_sample_day_has_no_fixed_quarters_or_invented_results_numbers():
+    from finn.ingest.nse_feed import load_snapshot
+
+    rows = load_snapshot()
+    assert rows and not [r for r in rows if "2025" in r["headline"] + r["body"]]
+    for r in (r for r in rows if r["category"] == "results"):
+        assert re.search(r"\{(next_)?quarter(_end)?\}", r["headline"] + r["body"])
+        assert "crore" not in r["body"].lower(), "results numbers must come from the stored quarter"
+
+
+def test_rewording_the_sample_day_drops_the_old_sample_alerts():
+    from finn.pipeline import _drop_stale_sample
+
+    when = datetime.now(timezone.utc).isoformat()
+    db.upsert_filing("STALE", "results", "STALE Q2 FY26 results", "", when, source="sample", is_demo=True)
+    old = db.add_alert("STALE", "announcement", {"headline": "STALE Q2 FY26 results", "is_sample": True,
+                                                 "filed_at": when}, 1, source_key="stale:old")
+    new = db.add_alert("STALE", "announcement", {"headline": "STALE Q2 FY27 results", "is_sample": True,
+                                                 "filed_at": when}, 1, source_key="stale:new")
+    _drop_stale_sample([{"ticker": "STALE", "headline": "STALE Q2 FY27 results"}])
+    assert db.get_alert(old) is None and db.get_alert(new) is not None
 
 
 def test_nse_times_are_read_as_india_time():

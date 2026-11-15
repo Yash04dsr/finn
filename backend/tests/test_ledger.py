@@ -1,7 +1,7 @@
 """The Promise ledger grades management's words against reported numbers in code."""
 from __future__ import annotations
 
-from finn.tools.ledger import grade, period_key, summarize
+from finn.tools.ledger import company_level, grade, period_key, summarize
 
 SERIES = [
     {"period": "Q2FY26", "revenue": 1000.0, "ebitda": 190.0, "depreciation": 30.0, "pat": 100.0},
@@ -47,6 +47,32 @@ def test_promise_not_repeated_on_later_calls_goes_quiet():
 def test_promise_for_the_current_quarter_is_too_early():
     rows = grade([claim("Q2FY27", "ebitda_margin", 15)], SERIES, ["Q2FY27"])
     assert rows[0]["status"] == "too_early"
+
+
+def test_segment_guidance_is_not_graded_against_company_numbers():
+    india = claim("Q4FY26", "revenue_growth", 25, metric="growth in India business")
+    defence = claim("Q1FY27", "ebitda_margin", 20, 25, metric="defense business margins")
+    company = claim("Q1FY27", "revenue_growth", 10, 20, metric="consolidated revenue growth")
+    rows = grade([india, defence, company], SERIES, ["Q4FY26", "Q1FY27"])
+    by_metric = {r["metric"]: r for r in rows}
+    for segment in ("growth in India business", "defense business margins"):
+        assert by_metric[segment]["status"] == "not_checkable"
+        assert by_metric[segment]["company_level"] is False and by_metric[segment]["delivered"] is None
+    assert by_metric["consolidated revenue growth"]["status"] == "kept"
+
+
+def test_long_term_target_is_not_held_to_one_quarter():
+    target = claim("Q4FY26", "ebitda_margin", 25)
+    target["horizon"] = "long term"
+    rows = grade([target], SERIES, ["Q4FY26"])
+    assert rows[0]["status"] == "too_early" and rows[0]["delivered"] is None
+
+
+def test_company_level_wording():
+    assert company_level("revenue growth", "we expect our business to grow 20% this year")
+    assert company_level("EBITDA margin", "Our aspiration continues to be in the 16 to 17% range.")
+    assert not company_level("growth in India business", "close to 25% growth in our India business")
+    assert not company_level("export revenue", "exports should grow 15%")
 
 
 def test_summary_and_period_order():

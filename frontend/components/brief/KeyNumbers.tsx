@@ -30,7 +30,11 @@ export default function KeyNumbers({ item }: { item: Pick<Alert, "kind" | "paylo
         {p.facts.period ? (
           <p className="num mt-1 text-[12px] text-[#4B5563]">
             {p.facts.period.replace(/^(Q\d)(FY)/, "$1 $2")}
-            {p.facts.is_illustrative || p.is_sample ? " · sample-day numbers, not reported figures" : ""}
+            {p.facts.is_illustrative
+              ? " · sample-day numbers, not reported figures"
+              : p.is_sample
+                ? " · reported figures on a sample-day filing"
+                : ""}
           </p>
         ) : null}
       </div>

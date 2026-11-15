@@ -191,7 +191,11 @@ function BriefScreen() {
             <Summary brief={brief} queueLength={queue.length} />
             {brief.is_sample ? (
               <div className="mt-2">
-                <SampleNote>Sample day for the demo. Filings and numbers are illustrative; live NSE filings replace them on the evening run.</SampleNote>
+                <SampleNote>
+                  Sample day for the demo. The filings are stand-ins; results numbers and promise checks use each
+                  company&rsquo;s reported quarter and its own call transcripts. Live NSE filings replace them on the
+                  evening run.
+                </SampleNote>
               </div>
             ) : null}
 

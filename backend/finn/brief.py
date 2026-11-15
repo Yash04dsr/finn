@@ -64,9 +64,11 @@ def draft_from_ledger(ticker: str, ledger: dict) -> list[dict]:
         return watchpoints(ticker)
     drafted, seen = [], set()
     rows = sorted(ledger.get("rows", []), key=lambda r: [-x for x in _pk(r["period"])])
+    from .tools.ledger import long_horizon
     for r in rows:
         lo, hi = _row_bounds(r)
-        if r["kind"] not in LABELS or r["kind"] in seen or lo is None:
+        if (r["kind"] not in LABELS or r["kind"] in seen or lo is None or not r.get("company_level", True)
+                or long_horizon(r.get("horizon"))):
             continue
         seen.add(r["kind"])
         src = r.get("promise_source") or {}
@@ -98,6 +100,23 @@ def backfill_bounds() -> int:
     return filled
 
 
+def prune_ungradable_watchpoints() -> int:
+    """Drop drafted watchpoints whose only source is segment-level or long-term guidance,
+    saved by builds that graded those against company-wide quarters."""
+    from .tools.ledger import EXTRACT_VERSION, checkable_now
+    removed = 0
+    with db.db() as c:
+        for w in c.execute("SELECT id, kind, source_chunk FROM watchpoints WHERE origin='drafted'"
+                           " AND source_chunk IS NOT NULL").fetchall():
+            claims = [dict(r) for r in c.execute(
+                "SELECT metric, quote, horizon FROM guidance_claims WHERE chunk_id=? AND kind=? AND version=?",
+                (w["source_chunk"], w["kind"], EXTRACT_VERSION))]
+            if claims and not any(checkable_now(cl) for cl in claims):
+                c.execute("DELETE FROM watchpoints WHERE id=?", (w["id"],))
+                removed += 1
+    return removed
+
+
 def _row_bounds(row: dict) -> tuple[float | None, float | None]:
     if row.get("unit") not in (None, "%"):
         return None, None
@@ -124,10 +143,12 @@ def _show_period(period: str | None) -> str:
     return f"{m.group(1)} {m.group(2)}" if m else (period or "")
 
 
-def touches(alert: dict, points: list[dict]) -> str:
+def touches(alert: dict, points: list[dict], check: dict | None = None) -> str:
     """The watchpoint or thesis area an alert bears on, in plain words."""
     p = alert.get("payload") or {}
     category = p.get("category") or alert["kind"]
+    if check and check.get("guided_band"):
+        return f"{check['metric']} {check['guided_band']}, as guided on the {check['guided_period']} call"
     if category == "results" or alert["kind"] == "price_move":
         graded = [w for w in points if w["kind"] in ("ebit_margin", "ebitda_margin", "revenue_growth")]
         if graded:
@@ -145,11 +166,13 @@ def promise_check(alert: dict, points: list[dict]) -> dict | None:
     Plain arithmetic on stored figures; both sides cite their source. None for other alerts.
     """
     p = alert.get("payload") or {}
-    if p.get("category") != "results":
+    if p.get("category") != "results" or engine.is_advance_notice(p.get("headline") or ""):
         return None
     facts = p.get("facts") or {}
     period = facts.get("period")
-    illustrative = bool(p.get("is_sample") or facts.get("is_illustrative"))
+    # A sample-day filing is a stand-in event; its numbers are only illustrative when the
+    # stored quarter itself is. Real reported numbers against real guidance are graded as such.
+    illustrative = bool(facts.get("is_illustrative"))
     options = []
     for kind in LABELS:
         guided = _guidance(alert["ticker"], kind, period, points)
@@ -188,28 +211,41 @@ def promise_check(alert: dict, points: list[dict]) -> dict | None:
         "status": status,
         "note": note,
         "is_illustrative": illustrative,
+        "is_sample_filing": bool(p.get("is_sample")),
+        "numbers_source": _numbers_source(facts) if delivered is not None else None,
     }
+
+
+def _numbers_source(facts: dict) -> str:
+    return {"screener_live": "Screener quarterly table, compiled from exchange filings",
+            "illustrative_snapshot": "Illustrative snapshot"}.get(facts.get("source") or "", "Stored quarterly table")
 
 
 def _guidance(ticker: str, kind: str, before: str | None, points: list[dict]) -> dict | None:
     """The newest numeric band for this metric guided on a call before the reported quarter."""
-    from .tools.ledger import EXTRACT_VERSION
+    from .tools.ledger import EXTRACT_VERSION, checkable_now
+    with db.db() as c:
+        claims = [dict(r) for r in c.execute(
+            "SELECT period, lo, hi, chunk_id, quote, metric, horizon FROM guidance_claims WHERE ticker=? AND kind=?"
+            " AND unit='%' AND lo IS NOT NULL AND version=?", (ticker, kind, EXTRACT_VERSION))]
+    whole = [r for r in claims if checkable_now(r)]
+    segment_only = {r["chunk_id"] for r in claims} - {r["chunk_id"] for r in whole}
     found = []
     for w in points:
         lo, hi = (w["lo"], w["hi"]) if w.get("lo") is not None else _parse_band(w.get("text") or "")
         m = _CALL.search(w.get("text") or "")
+        if w.get("origin") == "drafted" and w.get("source_chunk") in segment_only:
+            continue
         if w.get("kind") == kind and lo is not None and m:
             found.append({"period": m.group(1), "lo": lo, "hi": hi if hi is not None else lo,
-                          "chunk": w.get("source_chunk"), "quote": None})
-    with db.db() as c:
-        for r in c.execute(
-                "SELECT period, lo, hi, chunk_id, quote FROM guidance_claims WHERE ticker=? AND kind=?"
-                " AND unit='%' AND lo IS NOT NULL AND version=?", (ticker, kind, EXTRACT_VERSION)):
-            found.append({"period": r["period"], "lo": r["lo"], "hi": r["hi"] if r["hi"] is not None else r["lo"],
-                          "chunk": r["chunk_id"], "quote": r["quote"]})
+                          "chunk": w.get("source_chunk"), "quote": None, "kind": kind})
+    for r in whole:
+        found.append({"period": r["period"], "lo": r["lo"], "hi": r["hi"] if r["hi"] is not None else r["lo"],
+                      "chunk": r["chunk_id"], "quote": r["quote"], "kind": kind})
     found = [g for g in found if _pk(g["period"]) != (0, 0)
              and (not before or _pk(g["period"]) < _pk(before))]
-    return max(found, key=lambda g: _pk(g["period"])) if found else None
+    # Same call either way; the claim carries management's exact words.
+    return max(found, key=lambda g: (_pk(g["period"]), g["quote"] is not None)) if found else None
 
 
 def _delivered(ticker: str, kind: str, facts: dict) -> float | None:
@@ -237,8 +273,8 @@ def _guided_source(guided: dict) -> dict | None:
     with db.db() as c:
         chunk = c.execute("SELECT id, doc_title, url, text FROM chunks WHERE id=?", (guided["chunk"],)).fetchone()
         quote = guided["quote"] or (c.execute(
-            "SELECT quote FROM guidance_claims WHERE chunk_id=? AND quote<>'' ORDER BY id DESC LIMIT 1",
-            (guided["chunk"],)).fetchone() or {"quote": None})["quote"]
+            "SELECT quote FROM guidance_claims WHERE chunk_id=? AND kind=? AND quote<>'' ORDER BY id DESC LIMIT 1",
+            (guided["chunk"], guided.get("kind") or "")).fetchone() or {"quote": None})["quote"]
     if not chunk:
         return None
     return {"source_id": f"S{chunk['id']}", "title": chunk["doc_title"], "url": chunk["url"],
@@ -325,10 +361,11 @@ def brief(hours: int = 24) -> dict:
             continue
         points = points_cache.setdefault(a["ticker"], watchpoints(a["ticker"]))
         p = a.get("payload") or {}
+        check = promise_check(a, points)
         item = {
             **a,
-            "touches": touches(a, points),
-            "promise_check": promise_check(a, points),
+            "touches": touches(a, points, check),
+            "promise_check": check,
             "is_new": bool(last_look and (a.get("event_at") or "") > last_look),
             "past_verdict": _past_verdict(a["ticker"], p.get("category")),
             "verdict": decided.get(a["id"]),
@@ -341,6 +378,8 @@ def brief(hours: int = 24) -> dict:
             worth.append(item)
         else:
             background.append(item)
+    # Results that kept or broke a promise are the decisions the brief exists for, so they lead.
+    material.sort(key=lambda i: (i["promise_check"] or {}).get("status") not in ("kept", "missed"))
     return {
         "hours": hours,
         "last_look": last_look,

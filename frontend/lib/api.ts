@@ -103,6 +103,9 @@ export const api = {
   coverage: (ticker: string, signal?: AbortSignal) =>
     jsonFetch<CoverageResponse>(`/api/company/${encodeURIComponent(ticker)}/coverage`, { signal }),
 
+  resolve: (query: string, signal?: AbortSignal) =>
+    jsonFetch<{ ticker: string; name: string | null }>(`/api/resolve?q=${encodeURIComponent(query)}`, { signal }),
+
   watchpoints: (ticker: string, signal?: AbortSignal) =>
     jsonFetch<{ watchpoints: Watchpoint[] }>(`/api/company/${encodeURIComponent(ticker)}/watchpoints`, { signal }),
 

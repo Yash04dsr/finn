@@ -55,6 +55,21 @@ def _rekey_sample_alerts(watched: list[str]) -> None:
                           (key, db.json.dumps(payload), row["id"]))
 
 
+def _drop_stale_sample(current: list[dict]) -> None:
+    """Remove sample filings and alerts whose wording no longer matches the sample day,
+    such as results headlines naming an older quarter."""
+    keep = {(f["ticker"], f["headline"]) for f in current}
+    with db.db() as c:
+        for row in c.execute("SELECT id, ticker, headline FROM filings WHERE is_demo=1").fetchall():
+            if (row["ticker"], row["headline"]) not in keep:
+                c.execute("DELETE FROM filings WHERE id=?", (row["id"],))
+        for row in c.execute("SELECT id, ticker, payload FROM alerts WHERE kind='announcement'").fetchall():
+            payload = db.json.loads(row["payload"])
+            if payload.get("is_sample") and (row["ticker"], payload.get("headline") or "") not in keep:
+                c.execute("DELETE FROM verdicts WHERE alert_id=?", (row["id"],))
+                c.execute("DELETE FROM alerts WHERE id=?", (row["id"],))
+
+
 def _ingest_fundamentals(tickers: list[str]) -> None:
     from concurrent.futures import ThreadPoolExecutor
 
@@ -76,12 +91,17 @@ async def run_pipeline(hours: int = DEFAULT_WINDOW_HOURS, push: bool = True,
     started = datetime.now(timezone.utc)
     watched = portfolio_tools.watched_tickers()
 
-    # 1. Ingest announcements, prices and fundamentals.
+    # 1. Ingest prices and fundamentals, then announcements. The sample day names each
+    #    company's latest stored quarter, so the numbers have to be in first.
+    research = portfolio_tools.research_tickers()
+    await asyncio.to_thread(prices_ingest.refresh_all_prices, 60, research)
+    await asyncio.to_thread(_ingest_fundamentals, research)
     filings, mode = nse_feed.fetch_announcements(
         snapshot_anchor=started if sample else None, sample=sample, tickers=set(watched),
     )
     is_sample = mode == "sample"
     if is_sample:
+        _drop_stale_sample(filings)
         _rekey_sample_alerts(watched)
     new_filings, seen_filings = [], []
     for f in filings:
@@ -90,9 +110,6 @@ async def run_pipeline(hours: int = DEFAULT_WINDOW_HOURS, push: bool = True,
             f.get("body", ""), f["filed_at"], source=f.get("source", "nse"), is_demo=is_sample,
         )
         (new_filings if inserted else seen_filings).append(f)
-    research = portfolio_tools.research_tickers()
-    await asyncio.to_thread(prices_ingest.refresh_all_prices, 60, research)
-    await asyncio.to_thread(_ingest_fundamentals, research)
 
     # 2. Classify only what is new (hybrid: keywords first, one batched call for the rest).
     classified = await classifier.classify_batch(new_filings)
@@ -106,7 +123,7 @@ async def run_pipeline(hours: int = DEFAULT_WINDOW_HOURS, push: bool = True,
         pri, why = engine.announcement_priority(c["category"], c.get("importance"),
                                                 engine.get_thresholds(), c.get("headline", ""))
         item = {**c, "priority": pri, "why": why}
-        if c["category"] == "results" and pri <= 2:
+        if c["category"] == "results" and pri <= 2 and not engine.is_advance_notice(c.get("headline", "")):
             item.update(await enrichers.enrich_results(c["ticker"], c))
         elif c["category"] == "management_change" and pri <= 2:
             item.update(await enrichers.enrich_management_change(c["ticker"], c))

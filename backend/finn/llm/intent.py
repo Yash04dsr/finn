@@ -20,11 +20,15 @@ NAME_ALIASES = {
     "neuland": "NEULANDLAB", "gravita": "GRAVITA", "irctc": "IRCTC", "irfc": "IRFC",
     "paytm": "PAYTM", "suzlon": "SUZLON", "vedanta": "VEDL", "sbi": "SBIN",
     "state bank": "SBIN", "wipro": "WIPRO", "itc": "ITC", "bajaj finance": "BAJFINANCE",
+    "zomato": "ETERNAL", "mahindra": "M&M", "kotak": "KOTAKBANK", "icici bank": "ICICIBANK",
+    "hul": "HINDUNILVR", "airtel": "BHARTIARTL", "sun pharma": "SUNPHARMA", "maruti": "MARUTI",
 }
 
-_SYMBOL = re.compile(r"\b[A-Z][A-Z0-9&]{1,14}\b")
-_NOT_TICKERS = {"I", "A", "AI", "EOD", "QOQ", "YOY", "EBITDA", "PAT", "PBT", "CEO", "CFO",
-                "FY", "Q1", "Q2", "Q3", "Q4", "NSE", "BSE", "AGM", "ESOP", "MD", "OK", "USD", "INR"}
+_SYMBOL = re.compile(r"\b[A-Z][A-Z0-9&-]{0,18}[A-Z0-9]\b")
+_NOT_TICKERS = {"I", "A", "AI", "EOD", "QOQ", "YOY", "EBITDA", "EBIT", "PAT", "PBT", "CEO", "CFO",
+                "COO", "CTO", "FY", "Q1", "Q2", "Q3", "Q4", "H1", "H2", "NSE", "BSE", "AGM", "EGM",
+                "ESOP", "MD", "OK", "USD", "INR", "GDP", "RBI", "SEBI", "IPO", "EPS", "ROE", "ROCE",
+                "CAGR", "CAPEX", "OPM", "NPA", "GST", "US", "UK", "EU", "PLI", "ESG", "AGR", "NIM"}
 
 
 def known_tickers() -> set[str]:
@@ -39,7 +43,14 @@ def known_tickers() -> set[str]:
 
 
 def detect_ticker(message: str) -> str | None:
-    """Find the company a message is about, by symbol or by common name."""
+    """Find the company a message is about, by symbol or by name, for any listed company.
+
+    Order: common nicknames, symbols FINN already holds, any NSE symbol written in
+    capitals, a company name from the NSE list, then Screener search for a capitalised
+    token NSE does not list (BSE-only companies).
+    """
+    from ..ingest import symbols
+
     low = message.lower()
     for name, symbol in sorted(NAME_ALIASES.items(), key=lambda kv: -len(kv[0])):
         if re.search(rf"\b{re.escape(name)}\b", low):
@@ -52,7 +63,27 @@ def detect_ticker(message: str) -> str | None:
             continue
         if token in known and token not in _NOT_TICKERS:
             return token
+    written = [t for t in dict.fromkeys(_SYMBOL.findall(message)) if t not in _NOT_TICKERS and len(t) >= 2]
+    for token in written:
+        if symbols.is_listed(token):
+            return token
+    by_name = symbols.match_name(message)
+    if by_name:
+        return by_name
+    for token in written:
+        # Plain words typed in capitals for emphasis are not looked up.
+        if len(token) >= 3 and not token.isdigit() and token.lower() not in _COMMON_CAPS:
+            found = symbols.screener_search(token)
+            if found:
+                return found
     return None
+
+
+_COMMON_CAPS = {"what", "why", "how", "when", "who", "did", "does", "the", "and", "for", "not",
+                "all", "any", "this", "that", "with", "about", "guide", "guidance", "results",
+                "margin", "margins", "revenue", "profit", "growth", "debt", "cash", "call",
+                "risk", "risks", "please", "urgent", "now", "today", "update", "news", "stock",
+                "stocks", "company", "share", "shares", "price", "quarter", "year", "next", "last"}
 
 
 _PORTFOLIO_WIDE = re.compile(r"\b(portfolio|holdings|my stocks|brief|digest|today's alerts)\b", re.I)

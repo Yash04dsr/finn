@@ -97,10 +97,19 @@ def test_promise_check_missed_cites_both_sides():
     assert check["is_illustrative"] is False
 
 
-def test_promise_check_kept_and_sample_is_labelled():
+def test_sample_filing_with_reported_numbers_is_graded_but_flagged():
     _guide("PCK", 13.0, 14.0)
     check = brief.promise_check(_results("PCK", sample=True), brief.watchpoints("PCK"))
     assert check["status"] == "kept"
+    assert check["is_illustrative"] is False and check["is_sample_filing"] is True
+    assert check["note"] == "EBITDA margin 14.2% in Q2 FY26 against 13-14% guided on the Q4 FY25 call."
+
+
+def test_illustrative_numbers_are_labelled():
+    _guide("PCI", 13.0, 14.0)
+    alert = _results("PCI", sample=True)
+    alert["payload"]["facts"]["is_illustrative"] = True
+    check = brief.promise_check(alert, brief.watchpoints("PCI"))
     assert check["is_illustrative"] is True
     assert check["note"].startswith("Illustrative sample:")
 
@@ -126,6 +135,29 @@ def test_promise_check_not_reported_when_filing_lacks_the_metric():
     alert = _results("PCR", ebitda=None)
     check = brief.promise_check(alert, brief.watchpoints("PCR"))
     assert check["status"] == "not_reported" and check["delivered"] is None
+
+
+def test_segment_guidance_never_grades_company_results():
+    from finn.tools.ledger import EXTRACT_VERSION
+
+    chunk = db.add_chunk("PSG", "transcript", "PSG Q4 FY25 call", "Q4FY25", "https://example.com/psg.pdf", 0,
+                         "We should see close to 25% growth in our India business.")
+    with db.db() as c:
+        c.execute("INSERT INTO guidance_claims(ticker, doc_url, period, kind, metric, lo, hi, unit, horizon, quote,"
+                  " speaker, chunk_id, version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  ("PSG", "https://example.com/psg.pdf", "Q4FY25", "revenue_growth", "growth in India business",
+                   25.0, 25.0, "%", "FY26", "close to 25% growth in our India business", "", chunk, EXTRACT_VERSION))
+    brief.add_watchpoint("PSG", "Revenue growth 25%, as guided on the Q4FY25 call", "revenue_growth",
+                         25.0, 25.0, chunk, "drafted")
+    check = brief.promise_check(_results("PSG"), brief.watchpoints("PSG"))
+    assert check["status"] == "no_guidance" and check["guided_source"] is None
+
+
+def test_results_meeting_notice_has_no_promise_check():
+    _guide("PCT", 13.0, 14.0)
+    alert = _results("PCT")
+    alert["payload"]["headline"] = "Board Meeting Intimation for approval of Financial Results for Q3 FY27"
+    assert brief.promise_check(alert, brief.watchpoints("PCT")) is None
 
 
 def test_promise_check_is_none_for_other_alerts():

@@ -55,6 +55,7 @@ async def lifespan(_app: FastAPI):
     db.dedupe_alerts()
     from .. import brief as brief_mod
     brief_mod.backfill_bounds()
+    brief_mod.prune_ungradable_watchpoints()
     primary_chunks = sum(
         db.chunk_count(doc_type=kind)
         for kind in ("transcript", "annual_report", "results_filing")
@@ -72,11 +73,32 @@ async def lifespan(_app: FastAPI):
     scheduler_enabled = os.getenv("VERCEL") != "1"
     if scheduler_enabled:
         start_scheduler()
+    if os.getenv("FINN_TEST_DB") != "1" and os.getenv("FINN_WARM_LEDGER", "1") == "1":
+        asyncio.get_running_loop().create_task(_warm_sample_ledgers())
     try:
         yield
     finally:
         if scheduler_enabled:
             stop_scheduler()
+
+
+async def _warm_sample_ledgers() -> None:
+    """Read the recent calls behind each sample-day results filing and grade them, in the
+    background, so the promise check has management's guidance when the sample day loads."""
+    from .. import brief as brief_mod
+    from ..ingest.discovery import ensure_research_docs
+    from ..ingest.nse_feed import load_snapshot
+
+    watched = set(portfolio_tools.watched_tickers())
+    results = (r["ticker"] for r in load_snapshot()
+               if r["category"] == "results" and not engine.is_advance_notice(r["headline"]))
+    tickers = [t for t in dict.fromkeys(results) if t in watched]
+    for ticker in tickers:
+        try:
+            await asyncio.to_thread(ensure_research_docs, ticker, 4, 90.0)
+            await brief_mod.draft_for_results([{"ticker": ticker, "payload": {"category": "results"}}])
+        except Exception:
+            log.exception("ledger warm-up failed for %s", ticker)
 
 
 app = FastAPI(title="FINN", version="0.1.0", lifespan=lifespan)
@@ -260,21 +282,25 @@ async def api_chat(body: dict):
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     from ..llm.citations import collect_from_event, finalize
-    from ..llm.intent import route
+    from ..llm.intent import detect_ticker, route
 
-    lane, routed_ticker = route(message, ticker, _last_ticker.get(session_id))
+    # Name resolution may ask Screener about a BSE-only symbol, so keep it off the event loop.
+    named = ticker or await asyncio.to_thread(detect_ticker, message)
+    lane, routed_ticker = route(message, named, _last_ticker.get(session_id))
     prompt = message
     if lane == "research":
         _last_ticker[session_id] = routed_ticker
+        from ..ingest.symbols import company_name
+
         context = _filing_context(body.get("filing_id")) if body.get("filing_id") else ""
-        prompt = f"[About {routed_ticker}] {context} {message}".replace("  ", " ")
-    from ..llm.intent import detect_ticker
+        listed_as = company_name(routed_ticker)
+        about = f"{routed_ticker}, listed as {listed_as}" if listed_as else routed_ticker
+        prompt = f"[About {about}] {context} {message}".replace("  ", " ")
 
     # Standalone company questions (not follow-ups, not about one filing) can reuse an answer
     # until new documents or numbers arrive for that company.
     cache_key = None
-    if (lane == "research" and not body.get("filing_id") and len(message.split()) >= 4
-            and (ticker or detect_ticker(message))):
+    if lane == "research" and not body.get("filing_id") and len(message.split()) >= 4 and named:
         norm = re.sub(r"[^a-z0-9 ]+", "", message.lower()).strip()
         cache_key = hashlib.sha256(
             f"{routed_ticker}|{norm}|{db.corpus_version(routed_ticker)}".encode()).hexdigest()
@@ -423,6 +449,22 @@ def sse(obj: dict) -> str:
 async def api_companies():
     return {"portfolio": portfolio_tools.portfolio_snapshot(),
             "adhoc": portfolio_tools.adhoc_snapshot()}
+
+
+@app.get("/api/resolve")
+async def api_resolve(q: str = ""):
+    """Map a symbol or company name the investor typed to an NSE/BSE symbol."""
+    from ..ingest import symbols
+    from ..llm.intent import detect_ticker
+
+    query = q.strip()[:80]
+    if not query:
+        raise HTTPException(400, "type a symbol or company name")
+    upper = query.upper()
+    found = upper if symbols.is_listed(upper) else await asyncio.to_thread(detect_ticker, query)
+    if not found:
+        raise HTTPException(404, "no listed company matches that")
+    return {"ticker": found, "name": symbols.company_name(found)}
 
 
 @app.get("/api/company/{ticker}")
@@ -597,8 +639,8 @@ async def api_alert(alert_id: int):
     from .. import brief as brief_mod
 
     points = brief_mod.watchpoints(alert["ticker"])
-    alert["touches"] = brief_mod.touches(alert, points)
     alert["promise_check"] = brief_mod.promise_check(alert, points)
+    alert["touches"] = brief_mod.touches(alert, points, alert["promise_check"])
     return alert
 
 
