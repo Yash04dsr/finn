@@ -9,3 +9,5 @@ data/finn.db*
 data/docs/*.pdf
 brief.json
 render.yaml
+.env.local
+.vercel

@@ -1,5 +1,7 @@
 # FINN
 
+**Live: [finn-ochre-five.vercel.app](https://finn-ochre-five.vercel.app)** (open on a phone; installable as a PWA)
+
 **A brief you finish, graded against management's own words.**
 
 FINN is a web-first investment agent built for the ENAM AI Engineer Build Challenge. It is designed for a portfolio manager at a lean, concentrated fund who owns 15 to 20 Indian listed companies and protects one thing: the reason they own each of them.

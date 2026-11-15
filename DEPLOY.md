@@ -2,9 +2,21 @@
 
 **A brief you finish, graded against management's own words.**
 
-FINN's primary deliverable is the Next.js PWA (`frontend/`) deployed on Vercel, backed by the FastAPI service (`backend/`) on Render.
+FINN's primary deliverable is the Next.js PWA (`frontend/`) deployed on Vercel, backed by the FastAPI service (`backend/`), also on Vercel.
 
-## Backend (Render free tier — or Railway/Fly equivalently)
+Live: web app https://finn-ochre-five.vercel.app · backend https://finn-backend-flax.vercel.app/healthz
+
+## Backend on Vercel (current deployment)
+
+Project `finn-backend`, Root Directory `backend`, function region `bom1` (Mumbai: close to BSE and the model gateway).
+
+1. Config lives in `backend/vercel.json` (FastAPI preset, `maxDuration` 300) and `backend/pyproject.toml` (`[tool.vercel]` entrypoint and build script).
+2. The build runs `backend/vercel_build.py`: it downloads the issuer-hosted corpus and grades the sample-day results calls into `data/finn.db`, which ships in the read-only bundle. Each instance copies it to `FINN_DB_PATH` on cold start.
+3. Env vars: `HYDE_API_KEY`, `HYDE_BASE_URL`, `FINN_MODEL_FAST`, `FINN_MODEL_REASONING`, `FINN_ALLOWED_ORIGINS`, `FINN_DB_PATH=/tmp/finn.db`, `FINN_PDF_DIR=/tmp/finn-docs`, `XDG_CACHE_HOME=/tmp/.cache`, `FINN_VAPID_PUBLIC_KEY`, `FINN_VAPID_PRIVATE_KEY` (fixed keys so push subscriptions survive cold starts).
+4. State in `/tmp` is per instance: verdicts and the loaded sample day reset when an instance is recycled. The scheduler is off on Vercel (`VERCEL=1`); use **Settings → Load the sample day** or `POST /api/demo/run`.
+5. Redeploy: push to `main` (Git-connected), or `cd backend && npx vercel@latest deploy --prod`.
+
+## Backend alternative (Render free tier — or Railway/Fly equivalently)
 
 1. Push this repo to GitHub.
 2. Render → New → Blueprint → point at the repo (uses `backend/render.yaml`).
@@ -17,7 +29,7 @@ FINN's primary deliverable is the Next.js PWA (`frontend/`) deployed on Vercel, 
 ## Web app — Primary deliverable (Vercel)
 
 1. Vercel → New Project → import the repo.
-2. Root directory: leave as repo root (uses the root `vercel.json`, which installs and builds `frontend/` cleanly).
+2. Root Directory: `frontend` (uses `frontend/vercel.json`).
 3. Env var: `FINN_BACKEND_URL=https://<backend-url>` (consumed by the `/api/:path*` rewrite in `frontend/next.config.ts`).
 4. Deploy → share the URL; it works immediately on desktop and mobile browsers with zero install, and is installable as a PWA from mobile Safari/Chrome.
    - **iOS Web Push**: requires **Add to Home Screen** in Safari (iOS 16.4+).

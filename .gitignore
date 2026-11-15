@@ -30,3 +30,5 @@ mobile/.env.local
 .DS_Store
 *.log
 frontend/tsconfig.tsbuildinfo
+.vercel
+.env*.local

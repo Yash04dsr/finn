@@ -11,10 +11,10 @@ Dear ENAM team,
 
 **Who I built for.** I started from the investor in your brief: a small team making high-conviction decisions and living with the outcomes. That is a portfolio manager with 15 to 20 Indian listed companies who protects the reason they own each one. Their day has a check before the open, filings at any hour, a results season where each filing and call takes 30 to 60 minutes, and a quarterly question: did management do what they said? NSE alone publishes around a thousand announcements a day, most of them paperwork.
 
-**What I built.** FINN is a web-first Next.js PWA (`frontend/`, deployed on Vercel and backed by Render) built around three steps:
+**What I built.** FINN is a web-first Next.js PWA (`frontend/`, deployed on Vercel and backed by a FastAPI service on Vercel) built around three steps:
 
 1. **Finish the Brief and record verdicts.** The home screen shows only the items that need a decision, one at a time, with routine filings counted rather than shown. Each item names the watchpoint it touches, recalls your past verdict on similar items, and ends with "You are done for this window" once decided. Verdicts (`No impact`, `Watch closer`, `Changes the story`) and optional one-line reasons are saved to a decision journal.
-2. **Promise Check on results alerts and Promise Ledger on company pages.** Results alerts compute Revenue, EBITDA, and PAT YoY in code and attach a deterministic **PromiseCheck** (`kept`, `missed`, `in_band`, or `no_guidance`) comparing reported numbers against management's earlier guided band. Opening the alert (`/alert/[id]`) or the company page (`/company/[ticker]`) shows both citations side by side, the full Promise ledger, and your decision history.
+2. **Promise Check on results alerts and Promise Ledger on company pages.** Results alerts compute Revenue, EBITDA, and PAT YoY in code and attach a deterministic **PromiseCheck** (`kept`, `missed`, `not_reported`, or `no_guidance`) comparing reported numbers against management's earlier guided band. Opening the alert (`/alert/[id]`) or the company page (`/company/[ticker]`) shows both citations side by side, the full Promise ledger, and your decision history.
 3. **Unseen NSE/BSE ticker on demand.** Ask about or open any NSE/BSE ticker FINN has never seen. It pulls live quarterly numbers, finds and indexes the newest call transcripts (or the latest annual report when a company holds no calls, such as ITC) with staged progress, and answers only from server-verified primary citations—or states plainly when no primary documents exist.
 
 An Expo app (`mobile/`) is also kept in the repo as an additional native client speaking the same API.
@@ -35,7 +35,7 @@ An Expo app (`mobile/`) is also kept in the repo as an additional native client 
 
 **Trying it.** Open the Vercel link on desktop or phone (note: a cold Render free-tier backend can take ~30–50s on the first request). Use **Settings → Load the sample day** if the brief is empty, or follow the three-step walkthrough in `docs/demo-script.md`. `backend/evals/results/latest.json` holds the latest end-to-end eval run (7 of 7).
 
-Links: [Web app (Vercel): to add] · [GitHub repo](https://github.com/Yash04dsr/finn) · [AI build history: to add]
+Links: [Web app (Vercel)](https://finn-ochre-five.vercel.app) · [Backend health](https://finn-backend-flax.vercel.app/healthz) · [GitHub repo](https://github.com/Yash04dsr/finn) · [AI build history](https://github.com/Yash04dsr/finn/blob/main/docs/ai-build-history.md)
 
 Name
 IIT Delhi – 2027
