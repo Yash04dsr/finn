@@ -8,6 +8,50 @@ FINN is a web-first investment agent built for the ENAM AI Engineer Build Challe
 
 NSE alone publishes roughly 900 to 1,500 announcements a trading day, most of them paperwork. Reading one results filing and its call properly takes 30 to 60 minutes, and management promises are usually tracked from memory. FINN's job is to end the daily monitoring work in about two minutes, and to grade management rather than summarise it.
 
+## An investor's day
+
+A portfolio manager with 15 to 20 Indian names opens the brief before the market. Filings that need a decision come one at a time. On a results item, the quarter just reported sits next to the band management guided on an earlier call, and the manager records whether that changes the reason they own the company. The company page keeps that decision, the promise ledger, and the watchpoints taken from the call. A name that is not in the book is asked in the same place: FINN fetches the recent call, shows each step, and answers with the passage it used.
+
+## Visual tour
+
+### The brief
+
+![The brief opens on one filing that needs a decision, with the promise check on the card.](docs/screenshots/brief-home.png)
+
+![The card ends in three verdicts: No impact, Watch closer, or Changes the story.](docs/screenshots/brief-focus-card-verdicts.png)
+
+![Changes the story takes one line on what changed.](docs/screenshots/verdict-changes-the-story-reason.png)
+
+![When the decisions are in, the window closes and anything still worth a look sits underneath.](docs/screenshots/brief-done-for-this-window.png)
+
+### The promise and the company
+
+![Evidence sets the guided band beside the delivered figure, each with its source.](docs/screenshots/evidence-promise-check-guided-vs-delivered.png)
+
+![The company page grades the recent calls: kept, missed, and gone quiet.](docs/screenshots/company-promise-ledger.png)
+
+![Decisions and watchpoints stay on the company page, under questions the filings can answer.](docs/screenshots/company-decisions-and-watchpoints.png)
+
+![A management change names who is coming in and which holding reason it touches.](docs/screenshots/management-change-who-is-coming-in.png)
+
+### A company that is not in the book
+
+![The first question about a new ticker shows each step while the call is fetched.](docs/screenshots/unseen-ticker-staged-progress.png)
+
+![The answer cites numbered passages from the company's own calls.](docs/screenshots/unseen-ticker-cited-answer.png)
+
+![Each number opens the transcript line it came from. The tier, token count, and time sit under the sources.](docs/screenshots/unseen-ticker-sources-and-cost-footer.png)
+
+![A buy or sell request, and a question outside stocks and filings, each get one sentence and nothing more.](docs/screenshots/chat-advice-and-off-topic-refusal.png)
+
+### Settings, and the same page on a wide screen
+
+![Volume, a one-day price move, filing types, and quiet hours decide what reaches the brief.](docs/screenshots/settings-thresholds-and-filing-types.png)
+
+![Alerts open on the evidence page. Token use is split by the job that spent them.](docs/screenshots/settings-home-screen-alerts-and-model-usage.png)
+
+![On a wide screen the evidence page stays one centred column.](docs/screenshots/desktop-evidence-centred-column.png)
+
 ## Three-step tour
 
 1. **Finish the Brief and record verdicts.** The home screen (`/`) shows only items that need a decision, one at a time, with routine filings counted rather than shown. Each item names the watchpoint it touches, recalls your past verdict on similar filings, and ends with "You are done for this window" once decided. Verdicts (`No impact`, `Watch closer`, `Changes the story`) and optional one-line reasons are saved to a decision journal.
